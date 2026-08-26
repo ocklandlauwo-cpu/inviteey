@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+
+# Production build
+build/
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Test coverage
+coverage/
+
+# Prisma generated client (regenerated on deploy)
+# Keep schema.prisma, exclude generated client binary
+prisma/migrations/*.sql.bak
+
+# Uploads (local dev only — production uses /var/www/invitee/uploads)
+uploads/
+
+# PM2 logs
+logs/
+*.log
+
+# VSCode
+.vscode/
+
+# Claude Code local state
+.claude/
+
+# Credentials scratch file — contains live secrets, never commit
+Documentations/Readme
+Documentations/Readme.bak
+
+# Ad-hoc local debug scripts
+__dbtest.cjs
+nettest.cjs
+test-db.cjs

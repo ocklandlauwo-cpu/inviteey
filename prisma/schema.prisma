@@ -1,0 +1,680 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMs ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  organizer
+  admin
+  vendor
+  staff
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  active
+  suspended
+  unverified
+
+  @@map("user_status")
+}
+
+enum EventType {
+  wedding
+  birthday
+  sendoff
+  kitchen_party
+  corporate
+  fundraising
+  other
+
+  @@map("event_type")
+}
+
+enum EventStatus {
+  draft
+  active
+  event_day
+  completed
+  cancelled
+
+  @@map("event_status")
+}
+
+enum EventLang {
+  en
+  sw
+
+  @@map("event_lang")
+}
+
+enum EventTier {
+  basic
+  standard
+  premium
+  royal
+
+  @@map("event_tier")
+}
+
+enum InviteeCat {
+  family
+  friends
+  colleagues
+  vip
+  other
+
+  @@map("invitee_cat")
+}
+
+enum RsvpStatus {
+  pending
+  confirmed
+  declined
+
+  @@map("rsvp_status")
+}
+
+enum CheckinStatus {
+  not_arrived
+  checked_in
+
+  @@map("checkin_st")
+}
+
+enum GenStatus {
+  pending
+  processing
+  completed
+  failed
+
+  @@map("gen_status")
+}
+
+enum PledgeType {
+  fixed
+  flexible
+
+  @@map("pledge_type")
+}
+
+enum PledgeStatus {
+  unpaid
+  partially_paid
+  fully_paid
+
+  @@map("pledge_status")
+}
+
+enum VendorCat {
+  catering
+  photography
+  decoration
+  cake_champagne
+  food
+  drinks
+  transport
+  venue
+  other
+
+  @@map("vendor_cat")
+}
+
+enum VendorPayStatus {
+  unpaid
+  partially_paid
+  fully_paid
+
+  @@map("vendor_pay_st")
+}
+
+enum VendorDelStatus {
+  confirmed
+  in_progress
+  completed
+  issue_reported
+
+  @@map("vendor_del_st")
+}
+
+enum NotifType {
+  invitation
+  reminder
+  rsvp_followup
+  contribution_reminder
+  ecard
+  cancellation
+  contribution_ack
+
+  @@map("notif_type")
+}
+
+enum NotifChannel {
+  sms
+  whatsapp
+  email
+
+  @@map("notif_channel")
+}
+
+enum NotifGroup {
+  all
+  by_category
+  by_status
+  selected
+
+  @@map("notif_group")
+}
+
+enum NotifStatus {
+  pending
+  processing
+  completed
+  failed
+
+  @@map("notif_status")
+}
+
+enum DeliveryStatus {
+  pending
+  sent
+  delivered
+  failed
+
+  @@map("delivery_st")
+}
+
+enum RsvpResp {
+  yes
+  no
+  unknown
+
+  @@map("rsvp_resp")
+}
+
+enum ScanMethod {
+  qr
+  manual
+
+  @@map("scan_method")
+}
+
+enum AuditOp {
+  INSERT
+  UPDATE
+  DELETE
+
+  @@map("audit_op")
+}
+
+// ─── MODELS ──────────────────────────────────────────────────────────────────
+
+model User {
+  id           Int        @id @default(autoincrement())
+  email        String     @unique @db.VarChar(200)
+  passwordHash String     @map("password_hash")
+  name         String     @db.VarChar(200)
+  phone        String?    @db.VarChar(30)
+  role         UserRole   @default(organizer)
+  status       UserStatus @default(unverified)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  sessions              Session[]
+  emailVerifications    EmailVerification[]
+  passwordResets        PasswordReset[]
+  events                Event[]              @relation("OrganizerEvents")
+  eventStaff            EventStaff[]
+  invitees              Invitee[]            @relation("OrganizerInvitees")
+  pledges               Pledge[]             @relation("OrganizerPledges")
+  payments              Payment[]            @relation("OrganizerPayments")
+  notifications         Notification[]       @relation("OrganizerNotifications")
+  notificationsCreated  Notification[]       @relation("AdminNotifications")
+  checkins              Checkin[]            @relation("OrganizerCheckins")
+  tierActivations       Event[]              @relation("TierActivator")
+  vendorAccount         Vendor[]             @relation("VendorUser")
+  vendorsAdded          Vendor[]             @relation("VendorAddedBy")
+  ecards                Ecard[]              @relation("EcardOrganizer")
+  auditLogs             AuditLog[]
+  platformPayments      PlatformPayment[]    @relation("OrganizerPlatformPayments")
+  confirmedPayments     PlatformPayment[]    @relation("AdminPlatformPayments")
+  invoicesOrganizer     PlatformInvoice[]    @relation("OrganizerInvoices")
+  invoicesCreated       PlatformInvoice[]    @relation("AdminInvoices")
+
+  @@map("users")
+}
+
+// Lucia Auth v3 — session table
+model Session {
+  id        String   @id
+  userId    Int      @map("user_id")
+  expiresAt DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model EmailVerification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  token     String   @unique @db.VarChar(200)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verifications")
+}
+
+model PasswordReset {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  token     String    @unique @db.VarChar(200)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_resets")
+}
+
+model Event {
+  id                       Int         @id @default(autoincrement())
+  organizerId              Int         @map("organizer_id")
+  name                     String      @db.VarChar(200)
+  type                     EventType
+  status                   EventStatus @default(draft)
+  eventDate                DateTime    @map("event_date")
+  venueName                String      @map("venue_name") @db.VarChar(300)
+  venueAddress             String?     @map("venue_address")
+  description              String?
+  language                 EventLang   @default(en)
+  currencyCode             String      @default("TZS") @map("currency_code") @db.Char(3)
+  coverImagePath           String?     @map("cover_image_path") @db.VarChar(500)
+  expectedGuests           Int?        @map("expected_guests")
+  ecardTemplateId          Int?        @map("ecard_template_id")
+  // v2.0 tier system
+  tier                     EventTier   @default(basic)
+  inviteeLimit             Int         @default(5) @map("invitee_limit")
+  ecardAddonActive         Boolean     @default(false) @map("ecard_addon_active")
+  notificationsAddonActive Boolean     @default(false) @map("notifications_addon_active")
+  tierActivatedAt          DateTime?   @map("tier_activated_at")
+  tierActivatedById        Int?        @map("tier_activated_by")
+  deletedAt                DateTime?   @map("deleted_at")
+  createdAt                DateTime    @default(now()) @map("created_at")
+  updatedAt                DateTime    @updatedAt @map("updated_at")
+
+  organizer       User           @relation("OrganizerEvents", fields: [organizerId], references: [id])
+  tierActivatedBy User?          @relation("TierActivator", fields: [tierActivatedById], references: [id])
+  ecardTemplate   EcardTemplate? @relation(fields: [ecardTemplateId], references: [id])
+  staff           EventStaff[]
+  invitees        Invitee[]
+  pledges         Pledge[]
+  payments        Payment[]
+  vendors         Vendor[]
+  budget          EventBudget?
+  notifications   Notification[]
+  rsvpResponses   RsvpResponse[]
+  checkins         Checkin[]
+  ecards           Ecard[]
+  platformPayments  PlatformPayment[]
+  platformInvoices  PlatformInvoice[]  @relation("EventInvoices")
+
+  @@index([organizerId], name: "idx_events_organizer")
+  @@index([tier], name: "idx_events_tier")
+  @@index([tierActivatedById], name: "idx_events_tier_activated")
+  @@map("events")
+}
+
+model EventStaff {
+  id          Int      @id @default(autoincrement())
+  eventId     Int      @map("event_id")
+  organizerId Int      @map("organizer_id")
+  accessToken String   @unique @map("access_token") @db.VarChar(200)
+  pin         String   @db.Char(6)
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organizer User  @relation(fields: [organizerId], references: [id])
+
+  @@map("event_staff")
+}
+
+model Invitee {
+  id               Int           @id @default(autoincrement())
+  eventId          Int           @map("event_id")
+  organizerId      Int           @map("organizer_id")
+  name             String        @db.VarChar(200)
+  phone            String?       @db.VarChar(30)
+  email            String?       @db.VarChar(200)
+  category         InviteeCat    @default(other)
+  seatType         String        @default("single") @map("seat_type") @db.VarChar(10)
+  qrToken          String        @unique @default(uuid()) @map("qr_token") @db.Uuid
+  pin              String?       @db.VarChar(6)
+  rsvpStatus       RsvpStatus    @default(pending) @map("rsvp_status")
+  checkinStatus    CheckinStatus @default(not_arrived) @map("checkin_status")
+  checkinCount     Int           @default(0) @map("checkin_count")
+  contributionFlag Boolean       @default(false) @map("contribution_flag")
+  deletedAt        DateTime?     @map("deleted_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  event           Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organizer       User                    @relation("OrganizerInvitees", fields: [organizerId], references: [id])
+  pledges         Pledge[]
+  ecards          Ecard[]
+  rsvpResponses   RsvpResponse[]
+  checkins        Checkin[]
+  notifRecipients NotificationRecipient[]
+
+  @@index([eventId, organizerId], name: "idx_invitees_event_org")
+  @@index([qrToken], name: "idx_invitees_qr_token")
+  @@map("invitees")
+}
+
+model EcardTemplate {
+  id            Int       @id @default(autoincrement())
+  name          String    @db.VarChar(200)
+  eventType     EventType @map("event_type")
+  imagePath     String    @map("image_path") @db.VarChar(500)
+  thumbnailPath String?   @map("thumbnail_path") @db.VarChar(500)
+  textFields    Json?     @map("text_fields")
+  qrPosition    Json?     @map("qr_position")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  events Event[]
+  ecards Ecard[]
+
+  @@map("ecard_templates")
+}
+
+model Ecard {
+  id          Int       @id @default(autoincrement())
+  eventId     Int       @map("event_id")
+  inviteeId   Int       @map("invitee_id")
+  organizerId Int       @map("organizer_id")
+  templateId  Int       @map("template_id")
+  imagePath   String?   @map("image_path") @db.VarChar(500)
+  status      GenStatus @default(pending)
+  sentAt      DateTime? @map("sent_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  invitee   Invitee       @relation(fields: [inviteeId], references: [id], onDelete: Cascade)
+  organizer User          @relation("EcardOrganizer", fields: [organizerId], references: [id])
+  template  EcardTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([eventId, inviteeId], name: "idx_ecards_event_invitee")
+  @@map("ecards")
+}
+
+model Pledge {
+  id           Int          @id @default(autoincrement())
+  eventId      Int          @map("event_id")
+  inviteeId    Int          @map("invitee_id")
+  organizerId  Int          @map("organizer_id")
+  type         PledgeType   @default(fixed)
+  amount       BigInt
+  currencyCode String       @default("TZS") @map("currency_code") @db.Char(3)
+  status       PledgeStatus @default(unpaid)
+  notes        String?
+  deletedAt    DateTime?    @map("deleted_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  invitee   Invitee   @relation(fields: [inviteeId], references: [id], onDelete: Cascade)
+  organizer User      @relation("OrganizerPledges", fields: [organizerId], references: [id])
+  payments  Payment[]
+
+  @@index([eventId, inviteeId], name: "idx_pledges_event_invitee")
+  @@map("pledges")
+}
+
+model Payment {
+  id           Int       @id @default(autoincrement())
+  pledgeId     Int       @map("pledge_id")
+  eventId      Int       @map("event_id")
+  organizerId  Int       @map("organizer_id")
+  amount       BigInt
+  currencyCode String    @default("TZS") @map("currency_code") @db.Char(3)
+  paidAt       DateTime  @map("paid_at")
+  notes        String?
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  pledge    Pledge @relation(fields: [pledgeId], references: [id], onDelete: Cascade)
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organizer User   @relation("OrganizerPayments", fields: [organizerId], references: [id])
+
+  @@index([pledgeId], name: "idx_payments_pledge")
+  @@map("payments")
+}
+
+model Vendor {
+  id                 Int             @id @default(autoincrement())
+  userId             Int?            @map("user_id")
+  eventId            Int             @map("event_id")
+  organizerId        Int             @map("organizer_id")
+  name               String          @db.VarChar(200)
+  category           VendorCat
+  serviceDescription String?         @map("service_description")
+  estimatedCost      BigInt?         @map("estimated_cost")
+  agreedCost         BigInt?         @map("agreed_cost")
+  currencyCode       String          @default("TZS") @map("currency_code") @db.Char(3)
+  paymentStatus      VendorPayStatus @default(unpaid) @map("payment_status")
+  deliveryStatus     VendorDelStatus @default(confirmed) @map("delivery_status")
+  contactPhone       String?         @map("contact_phone") @db.VarChar(30)
+  contactEmail       String?         @map("contact_email") @db.VarChar(200)
+  notes              String?
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  vendorUser  User?  @relation("VendorUser", fields: [userId], references: [id])
+  organizer   User   @relation("VendorAddedBy", fields: [organizerId], references: [id])
+  event       Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId], name: "idx_vendors_event")
+  @@map("vendors")
+}
+
+model EventBudget {
+  id           Int      @id @default(autoincrement())
+  eventId      Int      @unique @map("event_id")
+  organizerId  Int      @map("organizer_id")
+  totalBudget  BigInt?  @map("total_budget")
+  currencyCode String   @default("TZS") @map("currency_code") @db.Char(3)
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_budgets")
+}
+
+model Notification {
+  id             Int          @id @default(autoincrement())
+  eventId        Int          @map("event_id")
+  organizerId    Int          @map("organizer_id")
+  createdById    Int          @map("created_by")
+  type           NotifType
+  channel        NotifChannel
+  subject        String?      @db.VarChar(300)
+  message        String
+  language       EventLang    @default(en)
+  recipientGroup NotifGroup   @default(all) @map("recipient_group")
+  status         NotifStatus  @default(pending)
+  scheduledAt    DateTime?    @map("scheduled_at")
+  sentAt         DateTime?    @map("sent_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  event      Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organizer  User                    @relation("OrganizerNotifications", fields: [organizerId], references: [id])
+  createdBy  User                    @relation("AdminNotifications", fields: [createdById], references: [id])
+  recipients NotificationRecipient[]
+
+  @@index([eventId], name: "idx_notifications_event")
+  @@map("notifications")
+}
+
+model NotificationRecipient {
+  id             Int            @id @default(autoincrement())
+  notificationId Int            @map("notification_id")
+  inviteeId      Int            @map("invitee_id")
+  channel        NotifChannel
+  status         DeliveryStatus @default(pending)
+  sentAt         DateTime?      @map("sent_at")
+  deliveredAt    DateTime?      @map("delivered_at")
+  errorMessage   String?        @map("error_message")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  invitee      Invitee      @relation(fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId], name: "idx_notif_recipients_notif")
+  @@map("notification_recipients")
+}
+
+model NotificationTemplate {
+  id        Int           @id @default(autoincrement())
+  name      String        @db.VarChar(200)
+  eventType EventType?    @map("event_type")
+  channel   NotifChannel
+  type      NotifType
+  language  EventLang     @default(en)
+  subject   String?       @db.VarChar(300)
+  message   String
+  isActive  Boolean       @default(true) @map("is_active")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  @@index([channel], name: "idx_notif_templates_channel")
+  @@map("notification_templates")
+}
+
+model RsvpResponse {
+  id          Int      @id @default(autoincrement())
+  inviteeId   Int      @map("invitee_id")
+  eventId     Int      @map("event_id")
+  response    RsvpResp
+  rawMessage  String?  @map("raw_message")
+  sourcePhone String?  @map("source_phone") @db.VarChar(30)
+  respondedAt DateTime @map("responded_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  invitee Invitee @relation(fields: [inviteeId], references: [id], onDelete: Cascade)
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([inviteeId], name: "idx_rsvp_invitee")
+  @@map("rsvp_responses")
+}
+
+model Checkin {
+  id          Int        @id @default(autoincrement())
+  eventId     Int        @map("event_id")
+  inviteeId   Int        @map("invitee_id")
+  organizerId Int        @map("organizer_id")
+  method      ScanMethod @default(qr)
+  checkedInAt DateTime   @map("checked_in_at")
+  notes       String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  invitee   Invitee @relation(fields: [inviteeId], references: [id], onDelete: Cascade)
+  organizer User    @relation("OrganizerCheckins", fields: [organizerId], references: [id])
+
+  @@index([eventId, inviteeId], name: "idx_checkins_event_invitee")
+  @@map("checkins")
+}
+
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  tableName String   @map("table_name") @db.VarChar(100)
+  recordId  Int      @map("record_id")
+  operation AuditOp
+  oldData   Json?    @map("old_data")
+  newData   Json?    @map("new_data")
+  changedBy Int?     @map("changed_by")
+  changedAt DateTime @default(now()) @map("changed_at")
+
+  user User? @relation(fields: [changedBy], references: [id])
+
+  @@index([tableName, recordId], name: "idx_audit_table_record")
+  @@index([changedAt], name: "idx_audit_changed_at")
+  @@map("audit_logs")
+}
+
+model PlatformPayment {
+  id              BigInt    @id @default(autoincrement())
+  organizerId     Int       @map("organizer_id")
+  eventId         Int?      @map("event_id")
+  serviceType     String    @map("service_type") @db.VarChar(50)
+  description     String?
+  amount          BigInt
+  currencyCode    String    @default("TZS") @map("currency_code") @db.VarChar(3)
+  paymentMethod   String    @default("mpesa") @map("payment_method") @db.VarChar(30)
+  referenceNumber String?   @map("reference_number") @db.VarChar(100)
+  status          String    @default("confirmed") @db.VarChar(20)
+  paidAt          DateTime  @map("paid_at")
+  confirmedBy     Int       @map("confirmed_by")
+  notes           String?
+  invoiceId       BigInt?   @unique @map("invoice_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  organizer       User             @relation("OrganizerPlatformPayments", fields: [organizerId], references: [id])
+  event           Event?           @relation(fields: [eventId], references: [id])
+  confirmedByUser User             @relation("AdminPlatformPayments",     fields: [confirmedBy], references: [id])
+  invoice         PlatformInvoice? @relation("InvoicePayment",            fields: [invoiceId],  references: [id])
+
+  @@index([organizerId], name: "idx_pp_organizer")
+  @@index([eventId],     name: "idx_pp_event")
+  @@index([status],      name: "idx_pp_status")
+  @@index([paidAt],      name: "idx_pp_paid_at")
+  @@index([invoiceId],   name: "idx_pp_invoice")
+  @@map("platform_payments")
+}
+
+model PlatformInvoice {
+  id           BigInt    @id @default(autoincrement())
+  organizerId  Int       @map("organizer_id")
+  eventId      Int       @map("event_id")
+  serviceType  String    @map("service_type") @db.VarChar(50)
+  description  String?
+  amount       BigInt
+  currencyCode String    @default("TZS") @map("currency_code") @db.VarChar(3)
+  status       String    @default("pending") @db.VarChar(20)
+  dueDate      DateTime? @map("due_date")
+  notes        String?
+  createdBy    Int       @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  organizer     User              @relation("OrganizerInvoices", fields: [organizerId], references: [id])
+  event         Event             @relation("EventInvoices",     fields: [eventId],     references: [id])
+  createdByUser User              @relation("AdminInvoices",     fields: [createdBy],   references: [id])
+  payment       PlatformPayment?  @relation("InvoicePayment")
+
+  @@index([organizerId], name: "idx_pinv_organizer")
+  @@index([eventId],     name: "idx_pinv_event")
+  @@index([status],      name: "idx_pinv_status")
+  @@map("platform_invoices")
+}
