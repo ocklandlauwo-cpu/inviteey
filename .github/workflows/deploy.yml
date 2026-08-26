@@ -22,8 +22,8 @@ jobs:
             cd ~/apps/inviteey
             git fetch origin main
             git reset --hard origin/main
-            set -a; source .env.local; set +a
             npm ci
+            set -a; source .env.local; set +a
             npx prisma generate
             npx prisma migrate deploy
             npm run build
