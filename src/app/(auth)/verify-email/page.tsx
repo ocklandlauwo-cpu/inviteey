@@ -9,6 +9,14 @@ import { Label }    from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 
 export default function VerifyEmailPage() {
+  return (
+    <React.Suspense fallback={<Loader2 size={32} className="animate-spin text-amber-600" />}>
+      <VerifyEmailForm />
+    </React.Suspense>
+  );
+}
+
+function VerifyEmailForm() {
   const params     = useSearchParams();
   const router     = useRouter();
   const { toast }  = useToast();

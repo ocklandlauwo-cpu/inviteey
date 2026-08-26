@@ -23,6 +23,14 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function ResetPasswordPage() {
+  return (
+    <React.Suspense fallback={<Loader2 size={32} className="animate-spin text-amber-600" />}>
+      <ResetPasswordForm />
+    </React.Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const params    = useSearchParams();
   const router    = useRouter();
   const { toast } = useToast();
