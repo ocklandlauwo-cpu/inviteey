@@ -20,7 +20,8 @@ jobs:
           script: |
             set -e
             cd ~/apps/inviteey
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             set -a; source .env.local; set +a
             npm ci
             npx prisma generate
