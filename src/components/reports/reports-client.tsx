@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   Download, Users, CheckCircle2, XCircle, Clock, UserCheck,
-  HandCoins, Bell, Mail, MessageSquare, Phone, AlertCircle,
+  HandCoins, Bell, Mail, MessageSquare, Phone, AlertCircle, ImageIcon, Send,
 } from "lucide-react";
 import { Button }  from "@/components/ui/button";
 import { Badge }   from "@/components/ui/badge";
@@ -15,6 +15,7 @@ interface InviteeRow {
   category:      string;
   rsvpStatus:    string;
   checkinStatus: string;
+  ecardStatus:   "none" | "pending" | "processing" | "completed" | "failed" | "sent";
 }
 
 interface PledgeStats {
@@ -41,6 +42,7 @@ interface Props {
   invitees:         InviteeRow[];
   hasContributions: boolean;
   hasExportCsv:     boolean;
+  hasEcards:        boolean;
   pledgeStats:      PledgeStats;
   notifications:    NotifRow[];
 }
@@ -114,7 +116,7 @@ function BarRow({ label, count, total, color }: {
 /* ─── main component ─────────────────────────────────────────────────── */
 
 export function ReportsClient({
-  eventId, invitees, hasContributions, hasExportCsv, pledgeStats, notifications,
+  eventId, invitees, hasContributions, hasExportCsv, hasEcards, pledgeStats, notifications,
 }: Props) {
   const total      = invitees.length;
   const confirmed  = invitees.filter(i => i.rsvpStatus    === "confirmed").length;
@@ -123,13 +125,20 @@ export function ReportsClient({
   const checkedIn  = invitees.filter(i => i.checkinStatus === "checked_in").length;
   const notArrived = total - checkedIn;
 
+  const ecardSent      = invitees.filter(i => i.ecardStatus === "sent").length;
+  const ecardGenerated = invitees.filter(i => i.ecardStatus === "completed").length;
+  const ecardPending   = invitees.filter(i => i.ecardStatus === "pending" || i.ecardStatus === "processing").length;
+  const ecardFailed    = invitees.filter(i => i.ecardStatus === "failed").length;
+  const ecardNone      = invitees.filter(i => i.ecardStatus === "none").length;
+
   const categories = ["family", "friends", "colleagues", "vip", "other"].map(cat => {
     const inCat = invitees.filter(i => i.category === cat);
     return {
-      key:       cat,
-      total:     inCat.length,
-      confirmed: inCat.filter(i => i.rsvpStatus    === "confirmed").length,
-      checkedIn: inCat.filter(i => i.checkinStatus === "checked_in").length,
+      key:        cat,
+      total:      inCat.length,
+      confirmed:  inCat.filter(i => i.rsvpStatus    === "confirmed").length,
+      checkedIn:  inCat.filter(i => i.checkinStatus === "checked_in").length,
+      ecardSent:  inCat.filter(i => i.ecardStatus   === "sent").length,
     };
   }).filter(c => c.total > 0);
 
@@ -237,6 +246,23 @@ export function ReportsClient({
           )}
         </div>
 
+        {hasEcards && (
+          <div className="bg-white rounded-2xl border border-warm-200 p-5">
+            <p className="font-semibold text-gray-900 mb-4">E-Card Status</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <StatCard icon={Send}      label="Sent"      value={fmt(ecardSent)}      sub={`${pct(ecardSent,total)}%`}      color="text-green-600" />
+              <StatCard icon={ImageIcon} label="Generated"  value={fmt(ecardGenerated)} color="text-blue-600" />
+              <StatCard icon={Clock}     label="Pending"    value={fmt(ecardPending)}   color="text-gray-500"  />
+              <StatCard icon={AlertCircle} label="Failed"   value={fmt(ecardFailed)}    color="text-red-500"   />
+            </div>
+            {ecardNone > 0 && (
+              <p className="text-xs text-gray-400">
+                {ecardNone} guest{ecardNone !== 1 ? "s" : ""} {ecardNone !== 1 ? "have" : "has"} no e-card generated yet.
+              </p>
+            )}
+          </div>
+        )}
+
         {categories.length > 0 && (
           <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden">
             <div className="px-5 py-3 border-b border-warm-100 bg-warm-50">
@@ -251,6 +277,9 @@ export function ReportsClient({
                     <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Confirmed</th>
                     <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Checked In</th>
                     <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Show-up Rate</th>
+                    {hasEcards && (
+                      <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">E-Card Sent</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -265,6 +294,9 @@ export function ReportsClient({
                       <td className="px-4 py-2.5 text-right text-gray-500">
                         {cat.confirmed > 0 ? `${pct(cat.checkedIn, cat.confirmed)}%` : "—"}
                       </td>
+                      {hasEcards && (
+                        <td className="px-4 py-2.5 text-right text-amber-600">{cat.ecardSent}</td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

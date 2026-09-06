@@ -30,7 +30,10 @@ export default async function ReportsPage({ params }: { params: { eventId: strin
   const [invitees, notifications] = await Promise.all([
     prisma.invitee.findMany({
       where:  { eventId, deletedAt: null },
-      select: { category: true, rsvpStatus: true, checkinStatus: true },
+      select: {
+        category: true, rsvpStatus: true, checkinStatus: true,
+        ecards: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, sentAt: true } },
+      },
     }),
     prisma.notification.findMany({
       where:   { eventId },
@@ -51,6 +54,7 @@ export default async function ReportsPage({ params }: { params: { eventId: strin
 
   const hasContributions = canAccessFeature(event.tier, "contributions");
   const hasExportCsv     = canAccessFeature(event.tier, "exportCsv");
+  const hasEcards        = canAccessFeature(event.tier, "ecard");
 
   let pledgeStats = { totalPledged: 0, totalCollected: 0, pledgeCount: 0 };
   if (hasContributions) {
@@ -64,6 +68,18 @@ export default async function ReportsPage({ params }: { params: { eventId: strin
       totalCollected: pledges.reduce((s, p) => s + p.payments.reduce((sum, pay) => sum + Number(pay.amount), 0), 0),
     };
   }
+
+  const inviteeRows = invitees.map(inv => {
+    const ecard = inv.ecards[0];
+    const ecardStatus: "none" | "pending" | "processing" | "completed" | "failed" | "sent" =
+      !ecard ? "none" : ecard.sentAt ? "sent" : ecard.status;
+    return {
+      category:      inv.category,
+      rsvpStatus:    inv.rsvpStatus,
+      checkinStatus: inv.checkinStatus,
+      ecardStatus,
+    };
+  });
 
   const notifRows = notifications.map(n => ({
     id:             n.id,
@@ -83,9 +99,10 @@ export default async function ReportsPage({ params }: { params: { eventId: strin
       <h1 className="text-xl font-extrabold text-gray-900 mb-6">Reports</h1>
       <ReportsClient
         eventId={event.id}
-        invitees={invitees}
+        invitees={inviteeRows}
         hasContributions={hasContributions}
         hasExportCsv={hasExportCsv}
+        hasEcards={hasEcards}
         pledgeStats={pledgeStats}
         notifications={notifRows}
       />
