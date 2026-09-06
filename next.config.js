@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
   eslint: {
     // Lint runs in CI (npm run lint) — don't let it block production builds.
     ignoreDuringBuilds: true,
