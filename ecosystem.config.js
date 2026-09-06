@@ -10,7 +10,7 @@ module.exports = {
     },
     {
       name: "invitee-workers",
-      script: "src/workers/index.ts",
+      script: "src/workers/start.ts",
       interpreter: "node_modules/.bin/tsx",
       instances: 1,
       env: { NODE_ENV: "production" },
