@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma }               from "@/lib/prisma";
-import { verifyWasenderWebhook, parseRsvpReply } from "@/lib/whatsapp";
+import { verifyWasenderWebhook, parseRsvpReply, RSVP_POLL_OPTIONS } from "@/lib/whatsapp";
 
 interface WasenderMessageKey {
   id?:                  string;
@@ -8,6 +8,41 @@ interface WasenderMessageKey {
   remoteJid?:           string;
   cleanedSenderPn?:     string;
   cleanedParticipantPn?: string;
+}
+
+/** Strip a WhatsApp JID (e.g. "255700000000@s.whatsapp.net") down to the bare phone digits. */
+function phoneFromJid(jid: string): string {
+  return jid.split("@")[0].replace(/\D/g, "");
+}
+
+/** Record an RSVP against whichever invitee owns this phone number, if any. */
+async function recordRsvp(from: string, answer: "yes" | "no", rawMessage: string) {
+  const normalized = from.startsWith("+") ? from : `+${from}`;
+  const invitee = await prisma.invitee.findFirst({
+    where: { OR: [{ phone: from }, { phone: normalized }], deletedAt: null },
+    include: { event: { select: { id: true } } },
+  });
+  if (!invitee) return;
+
+  const rsvpStatus = answer === "yes" ? "confirmed" : "declined";
+
+  await prisma.invitee.update({
+    where: { id: invitee.id },
+    data:  { rsvpStatus },
+  });
+
+  await prisma.rsvpResponse.create({
+    data: {
+      inviteeId:   invitee.id,
+      eventId:     invitee.event.id,
+      response:    answer,
+      rawMessage,
+      sourcePhone: from,
+      respondedAt: new Date(),
+    },
+  });
+
+  console.log(`[wasender-webhook] RSVP ${rsvpStatus} from ${from} — invitee ${invitee.id}`);
 }
 
 /* Numeric status codes per WaSender's messages.update webhook */
@@ -32,9 +67,10 @@ export async function POST(req: NextRequest) {
     const payload = JSON.parse(rawBody) as {
       event?: string;
       data?: {
-        messages?: { key?: WasenderMessageKey; messageBody?: string };
-        key?:      WasenderMessageKey;
-        update?:   { status?: number };
+        messages?:   { key?: WasenderMessageKey; messageBody?: string };
+        key?:        WasenderMessageKey;
+        update?:     { status?: number };
+        pollResult?: { name?: string; voters?: string[] }[];
       };
     };
 
@@ -55,37 +91,21 @@ export async function POST(req: NextRequest) {
       const rsvpAnswer = parseRsvpReply(message);
       if (rsvpAnswer === "unknown") return NextResponse.json({ ok: true });
 
-      /* Find invitee by phone — try with and without leading + */
-      const normalized = from.startsWith("+") ? from : `+${from}`;
-      const invitee = await prisma.invitee.findFirst({
-        where: {
-          OR: [{ phone: from }, { phone: normalized }],
-          deletedAt: null,
-        },
-        include: { event: { select: { id: true } } },
-      });
+      await recordRsvp(from, rsvpAnswer, message);
+    }
 
-      if (!invitee) return NextResponse.json({ ok: true });
+    /* ── Poll vote → RSVP (tap-to-vote ATTEND / NOT ATTEND) ─ */
+    if (payload.event === "poll.results") {
+      const results = payload.data?.pollResult ?? [];
+      const attend    = results.find(r => r.name === RSVP_POLL_OPTIONS.attend);
+      const notAttend = results.find(r => r.name === RSVP_POLL_OPTIONS.notAttend);
 
-      const rsvpStatus = rsvpAnswer === "yes" ? "confirmed" : "declined";
-
-      await prisma.invitee.update({
-        where: { id: invitee.id },
-        data:  { rsvpStatus },
-      });
-
-      await prisma.rsvpResponse.create({
-        data: {
-          inviteeId:   invitee.id,
-          eventId:     invitee.event.id,
-          response:    rsvpAnswer === "yes" ? "yes" : "no",
-          rawMessage:  message,
-          sourcePhone: from,
-          respondedAt: new Date(),
-        },
-      });
-
-      console.log(`[wasender-webhook] RSVP ${rsvpStatus} from ${from} — invitee ${invitee.id}`);
+      for (const jid of attend?.voters ?? []) {
+        await recordRsvp(phoneFromJid(jid), "yes", RSVP_POLL_OPTIONS.attend);
+      }
+      for (const jid of notAttend?.voters ?? []) {
+        await recordRsvp(phoneFromJid(jid), "no", RSVP_POLL_OPTIONS.notAttend);
+      }
     }
 
     /* ── Message status update → delivery tracking ───────── */

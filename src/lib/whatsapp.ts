@@ -66,6 +66,55 @@ export async function sendWhatsApp({ to, message, imageUrl }: SendWhatsAppOption
   return { success: true, auto: false, deepLink };
 }
 
+/** Fixed option labels for the RSVP poll — shared with the webhook handler so votes match exactly. */
+export const RSVP_POLL_OPTIONS = { attend: "✅ ATTEND", notAttend: "❌ NOT ATTEND" } as const;
+
+export interface WhatsAppPollResult {
+  success: boolean;
+  auto:    boolean; // true = sent via API / false = polls have no deep-link fallback
+}
+
+/**
+ * Send a native WhatsApp poll as a tap-to-vote RSVP (ATTEND / NOT ATTEND).
+ * Requires the live WaSender API — there's no deep-link equivalent for polls,
+ * so this silently no-ops (auto: false) when only mocked/unconfigured.
+ */
+export async function sendRsvpPoll(to: string, eventName: string): Promise<WhatsAppPollResult> {
+  const token  = process.env.WASENDER_API_KEY;
+  const apiUrl = process.env.WASENDER_API_URL;
+
+  if (!token || token === "mock-wasender-token" || !apiUrl) {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[WHATSAPP MOCK] Poll to: ${to}\nWill you attend ${eventName}?`);
+    }
+    return { success: false, auto: false };
+  }
+
+  try {
+    const { data } = await axios.post(
+      `${apiUrl}/send-message`,
+      {
+        to,
+        poll: {
+          question:    `Will you attend ${eventName}?`,
+          options:     [RSVP_POLL_OPTIONS.attend, RSVP_POLL_OPTIONS.notAttend],
+          multiSelect: false,
+        },
+      },
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } },
+    );
+
+    if (data?.success === false) {
+      console.error("[whatsapp] WaSender rejected poll send:", data);
+      return { success: false, auto: true };
+    }
+    return { success: true, auto: true };
+  } catch (e) {
+    console.error("[whatsapp] WaSender poll error:", e);
+    return { success: false, auto: true };
+  }
+}
+
 /** Build the invitation message text used when sending an e-card */
 export function buildInvitationMessage(opts: {
   guestName: string;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession }           from "@/lib/auth";
 import { prisma }               from "@/lib/prisma";
-import { sendWhatsApp, buildInvitationMessage } from "@/lib/whatsapp";
+import { sendWhatsApp, sendRsvpPoll, buildInvitationMessage } from "@/lib/whatsapp";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://invitee.co.tz";
 
@@ -55,6 +55,12 @@ export async function POST(
         where: { id: ecard.id },
         data:  { sentAt: new Date() },
       });
+    }
+
+    /* Follow up with a tap-to-vote RSVP poll — only meaningful over the real
+     * API, since a wa.me deep link can't carry a poll. */
+    if (result.auto) {
+      await sendRsvpPoll(phone, event.name);
     }
 
     return NextResponse.json({
