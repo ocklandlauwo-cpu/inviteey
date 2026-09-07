@@ -17,8 +17,10 @@ const AUTH_ONLY = [/^\/login/, /^\/register/, /^\/forgot-password/, /^\/reset-pa
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  /* CSRF protection for all state-changing API calls */
-  if (req.method !== "GET" && pathname.startsWith("/api/")) {
+  /* CSRF protection for all state-changing API calls — excludes webhooks,
+   * which are called server-to-server by third parties and never carry an
+   * Origin header. Those routes authenticate via their own signature checks. */
+  if (req.method !== "GET" && pathname.startsWith("/api/") && !pathname.startsWith("/api/v1/webhooks/")) {
     const originHeader  = req.headers.get("Origin");
     const hostHeader    = req.headers.get("Host");
     if (!originHeader || !hostHeader || !verifyRequestOrigin(originHeader, [hostHeader])) {
