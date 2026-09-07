@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import {
-  ImageIcon, Plus, Loader2, Trash2, ToggleLeft, ToggleRight, X, Type,
+  ImageIcon, Plus, Loader2, Trash2, ToggleLeft, ToggleRight, X, Type, Pencil, Eye,
 } from "lucide-react";
 import { Badge }   from "@/components/ui/badge";
 import { Button }  from "@/components/ui/button";
@@ -66,6 +66,9 @@ export default function AdminEcardTemplatesPage() {
   const [deletingId,  setDeletingId]  = React.useState<number | null>(null);
   const [uploading,   setUploading]   = React.useState(false);
   const [textFields,  setTextFields]  = React.useState<TextFieldEntry[]>([]);
+  const [editingId,   setEditingId]   = React.useState<number | null>(null);
+  const [previewUrl,     setPreviewUrl]     = React.useState<string | null>(null);
+  const [previewingId,   setPreviewingId]   = React.useState<number | null>(null);
 
   const fileRef   = React.useRef<HTMLInputElement>(null);
   const [preview, setPreview] = React.useState<string | null>(null);
@@ -112,49 +115,114 @@ export default function AdminEcardTemplatesPage() {
     setTextFields(prev => prev.filter(f => f.id !== id));
   }
 
+  function resetForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setForm({ name: "", eventType: "wedding", qrX: "650", qrY: "550", qrSize: "180" });
+    setTextFields([]);
+    setPreview(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function startEdit(tpl: EcardTemplate) {
+    setEditingId(tpl.id);
+    setForm({
+      name:      tpl.name,
+      eventType: tpl.eventType,
+      qrX:       String(tpl.qrPosition?.x    ?? 650),
+      qrY:       String(tpl.qrPosition?.y    ?? 550),
+      qrSize:    String(tpl.qrPosition?.size ?? 180),
+    });
+    const existing = (tpl.textFields as Partial<TextFieldEntry>[] | null) ?? [];
+    setTextFields(existing.map((f, i) => ({
+      id:          `existing_${tpl.id}_${i}`,
+      key:         f.key ?? "inviteeName",
+      staticValue: f.staticValue ?? "",
+      x:           String(f.x ?? 400),
+      y:           String(f.y ?? 200),
+      fontSize:    String(f.fontSize ?? 28),
+      color:       f.color ?? "#ffffff",
+      bold:        f.bold ?? true,
+      align:       f.align ?? "center",
+    })));
+    setPreview(null);
+    setShowForm(true);
+  }
+
+  function buildTextFieldsPayload() {
+    return textFields.map(({ id: _id, ...f }) => ({
+      key:  f.key,
+      ...(f.key === "custom" ? { staticValue: f.staticValue } : {}),
+      x:        parseInt(f.x, 10)        || 0,
+      y:        parseInt(f.y, 10)        || 0,
+      fontSize: parseInt(f.fontSize, 10) || 24,
+      color:    f.color || "#ffffff",
+      bold:     f.bold,
+      align:    f.align,
+    }));
+  }
+
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
-    const file = fileRef.current?.files?.[0];
-    if (!file)         { toast({ title: "Select an image file", variant: "destructive" }); return; }
     if (!form.name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
 
     setUploading(true);
     try {
-      const textFieldsJson = JSON.stringify(
-        textFields.map(({ id: _id, ...f }) => ({
-          key:  f.key,
-          ...(f.key === "custom" ? { staticValue: f.staticValue } : {}),
-          x:        parseInt(f.x, 10)        || 0,
-          y:        parseInt(f.y, 10)        || 0,
-          fontSize: parseInt(f.fontSize, 10) || 24,
-          color:    f.color || "#ffffff",
-          bold:     f.bold,
-          align:    f.align,
-        }))
-      );
+      if (editingId) {
+        const res  = await fetch(`/api/v1/admin/ecard-templates/${editingId}`, {
+          method:  "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({
+            name:       form.name,
+            eventType:  form.eventType,
+            qrX:        parseInt(form.qrX, 10)    || 0,
+            qrY:        parseInt(form.qrY, 10)    || 0,
+            qrSize:     parseInt(form.qrSize, 10) || 0,
+            textFields: buildTextFieldsPayload(),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) { toast({ title: "Update failed", description: json.error, variant: "destructive" }); return; }
+        toast({ title: "Template updated" });
+      } else {
+        const file = fileRef.current?.files?.[0];
+        if (!file) { toast({ title: "Select an image file", variant: "destructive" }); return; }
 
-      const fd = new FormData();
-      fd.append("image",      file);
-      fd.append("name",       form.name);
-      fd.append("eventType",  form.eventType);
-      fd.append("qrX",        form.qrX);
-      fd.append("qrY",        form.qrY);
-      fd.append("qrSize",     form.qrSize);
-      fd.append("textFields", textFieldsJson);
+        const fd = new FormData();
+        fd.append("image",      file);
+        fd.append("name",       form.name);
+        fd.append("eventType",  form.eventType);
+        fd.append("qrX",        form.qrX);
+        fd.append("qrY",        form.qrY);
+        fd.append("qrSize",     form.qrSize);
+        fd.append("textFields", JSON.stringify(buildTextFieldsPayload()));
 
-      const res  = await fetch("/api/v1/admin/ecard-templates", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) { toast({ title: "Upload failed", description: json.error, variant: "destructive" }); return; }
-      toast({ title: "Template uploaded" });
-      setShowForm(false);
-      setForm({ name: "", eventType: "wedding", qrX: "650", qrY: "550", qrSize: "180" });
-      setTextFields([]);
-      setPreview(null);
-      if (fileRef.current) fileRef.current.value = "";
+        const res  = await fetch("/api/v1/admin/ecard-templates", { method: "POST", body: fd });
+        const json = await res.json();
+        if (!res.ok) { toast({ title: "Upload failed", description: json.error, variant: "destructive" }); return; }
+        toast({ title: "Template uploaded" });
+      }
+      resetForm();
       await load();
     } catch {
       toast({ title: "Something went wrong", variant: "destructive" });
     } finally { setUploading(false); }
+  }
+
+  async function handlePreview(tpl: EcardTemplate) {
+    setPreviewingId(tpl.id);
+    try {
+      const res = await fetch(`/api/v1/admin/ecard-templates/${tpl.id}/preview`, { method: "POST" });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        toast({ title: "Preview failed", description: json.error, variant: "destructive" });
+        return;
+      }
+      const blob = await res.blob();
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch {
+      toast({ title: "Something went wrong", variant: "destructive" });
+    } finally { setPreviewingId(null); }
   }
 
   async function toggleActive(tpl: EcardTemplate) {
@@ -195,17 +263,17 @@ export default function AdminEcardTemplatesPage() {
         </div>
         <Button
           className="bg-amber-600 hover:bg-amber-700 text-white gap-2"
-          onClick={() => setShowForm(v => !v)}
+          onClick={() => (showForm ? resetForm() : setShowForm(true))}
         >
           {showForm ? <X size={15} /> : <Plus size={15} />}
           {showForm ? "Cancel" : "Upload Template"}
         </Button>
       </div>
 
-      {/* Upload form */}
+      {/* Upload / edit form */}
       {showForm && (
         <div className="bg-white rounded-2xl border border-warm-200 p-6">
-          <h2 className="font-bold text-gray-900 mb-5">New Template</h2>
+          <h2 className="font-bold text-gray-900 mb-5">{editingId ? "Edit Template" : "New Template"}</h2>
           <form onSubmit={handleUpload} className="space-y-6">
 
             {/* Name + Event Type */}
@@ -232,24 +300,31 @@ export default function AdminEcardTemplatesPage() {
             </div>
 
             {/* Image upload */}
-            <div className="space-y-2">
-              <Label>
-                Template Image *{" "}
-                <span className="text-gray-400 font-normal text-xs">(JPG, PNG or WebP — text overlays and QR will be composited at generation)</span>
-              </Label>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".jpg,.jpeg,.png,.webp"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
-              />
-              {preview && (
-                <div className="relative w-32 h-40 rounded-xl overflow-hidden border border-warm-200 mt-2">
-                  <Image src={preview} alt="Preview" fill className="object-cover" />
-                </div>
-              )}
-            </div>
+            {!editingId && (
+              <div className="space-y-2">
+                <Label>
+                  Template Image *{" "}
+                  <span className="text-gray-400 font-normal text-xs">(JPG, PNG or WebP — text overlays and QR will be composited at generation)</span>
+                </Label>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp"
+                  onChange={handleFileChange}
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+                />
+                {preview && (
+                  <div className="relative w-32 h-40 rounded-xl overflow-hidden border border-warm-200 mt-2">
+                    <Image src={preview} alt="Preview" fill className="object-cover" />
+                  </div>
+                )}
+              </div>
+            )}
+            {editingId && (
+              <p className="text-xs text-gray-400 bg-warm-50 rounded-xl px-4 py-3">
+                The template image itself can't be changed here — delete and re-upload to replace the artwork. You can freely edit name, event type, QR position, and text overlays below.
+              </p>
+            )}
 
             {/* QR code position */}
             <div className="space-y-2">
@@ -412,8 +487,8 @@ export default function AdminEcardTemplatesPage() {
                 disabled={uploading}
                 className="bg-amber-600 hover:bg-amber-700 text-white gap-2"
               >
-                {uploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                Upload Template
+                {uploading ? <Loader2 size={14} className="animate-spin" /> : editingId ? <Pencil size={14} /> : <Plus size={14} />}
+                {editingId ? "Save Changes" : "Upload Template"}
               </Button>
             </div>
           </form>
@@ -473,7 +548,22 @@ export default function AdminEcardTemplatesPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-1.5 pt-1">
+                  <button
+                    title="Preview with sample data"
+                    disabled={previewingId === tpl.id}
+                    onClick={() => handlePreview(tpl)}
+                    className="flex items-center justify-center gap-1 text-xs py-1.5 px-2 rounded-lg border border-warm-200 text-gray-600 hover:border-amber-300 hover:text-amber-700 transition-colors disabled:opacity-50"
+                  >
+                    {previewingId === tpl.id ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
+                  </button>
+                  <button
+                    title="Edit template"
+                    onClick={() => startEdit(tpl)}
+                    className="flex items-center justify-center gap-1 text-xs py-1.5 px-2 rounded-lg border border-warm-200 text-gray-600 hover:border-amber-300 hover:text-amber-700 transition-colors"
+                  >
+                    <Pencil size={12} />
+                  </button>
                   <button
                     title={tpl.isActive ? "Deactivate" : "Activate"}
                     disabled={togglingId === tpl.id}
@@ -497,6 +587,27 @@ export default function AdminEcardTemplatesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Preview modal */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-gray-900/70 flex items-center justify-center p-6"
+          onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }}
+        >
+          <div className="relative max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }}
+              className="absolute -top-10 right-0 text-white/80 hover:text-white flex items-center gap-1 text-sm"
+            >
+              <X size={16} /> Close
+            </button>
+            <img src={previewUrl} alt="Template preview" className="w-full rounded-2xl shadow-2xl" />
+            <p className="text-center text-white/60 text-xs mt-3">
+              Preview with sample data — "John Doe", today's date, sample venue
+            </p>
+          </div>
         </div>
       )}
     </div>

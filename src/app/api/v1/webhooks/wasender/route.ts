@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
+    console.log("[wasender-webhook] raw payload:", rawBody);
+
     const payload = JSON.parse(rawBody) as {
       event?: string;
       data?: {

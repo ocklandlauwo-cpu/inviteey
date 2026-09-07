@@ -3,6 +3,9 @@ import path from "path";
 import fs   from "fs/promises";
 import { getSession } from "@/lib/auth";
 import { prisma }     from "@/lib/prisma";
+import type { EventType } from "@prisma/client";
+
+const VALID_EVENT_TYPES: EventType[] = ["wedding","birthday","sendoff","kitchen_party","corporate","fundraising","other"];
 
 const UPLOADS_DIR   = process.env.UPLOAD_DIR ?? "./uploads";
 const TEMPLATES_DIR = path.resolve(UPLOADS_DIR, "templates");
@@ -29,6 +32,9 @@ export async function PATCH(
 
     if (typeof body.name      === "string")  data.name      = body.name.trim();
     if (typeof body.isActive  === "boolean") data.isActive  = body.isActive;
+    if (typeof body.eventType === "string" && VALID_EVENT_TYPES.includes(body.eventType as EventType)) {
+      data.eventType = body.eventType;
+    }
     if (Array.isArray(body.textFields)) {
       data.textFields = JSON.parse(JSON.stringify(body.textFields));
     }
