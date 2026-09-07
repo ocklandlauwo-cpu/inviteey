@@ -15,7 +15,8 @@
     "db:studio":  "prisma studio",
     "db:generate":"prisma generate",
     "worker":     "tsx src/workers/start.ts",
-    "test:sms":   "tsx scripts/test-sms.ts"
+    "test:sms":   "tsx scripts/test-sms.ts",
+    "test:whatsapp": "tsx scripts/test-whatsapp.ts"
   },
   "dependencies": {
     "@google/generative-ai":          "0.15.0",

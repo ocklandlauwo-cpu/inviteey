@@ -2,22 +2,53 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma }               from "@/lib/prisma";
 import { verifyWasenderWebhook, parseRsvpReply } from "@/lib/whatsapp";
 
+interface WasenderMessageKey {
+  id?:                  string;
+  fromMe?:              boolean;
+  remoteJid?:           string;
+  cleanedSenderPn?:     string;
+  cleanedParticipantPn?: string;
+}
+
+/* Numeric status codes per WaSender's messages.update webhook */
+const STATUS_CODE: Record<number, "sent" | "delivered" | "failed" | null> = {
+  0: "failed",
+  1: null,       // pending — nothing to record yet
+  2: "sent",
+  3: "delivered",
+  4: "delivered", // read
+  5: "delivered", // played
+};
+
 export async function POST(req: NextRequest) {
   try {
-    const rawBody  = await req.text();
-    const signature = req.headers.get("x-wasender-signature");
+    const rawBody   = await req.text();
+    const signature = req.headers.get("x-webhook-signature");
 
-    if (!verifyWasenderWebhook(rawBody, signature)) {
+    if (!verifyWasenderWebhook(signature)) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    const payload = JSON.parse(rawBody) as Record<string, unknown>;
-    const type    = payload.type as string | undefined;
+    const payload = JSON.parse(rawBody) as {
+      event?: string;
+      data?: {
+        messages?: { key?: WasenderMessageKey; messageBody?: string };
+        key?:      WasenderMessageKey;
+        update?:   { status?: number };
+      };
+    };
 
     /* ── Inbound message → RSVP ─────────────────────────── */
-    if (type === "message_received") {
-      const from    = (payload.from    as string | undefined)?.trim();
-      const message = (payload.message as string | undefined)?.trim() ?? "";
+    if (payload.event === "messages.upsert" || payload.event === "messages.received") {
+      const msg = payload.data?.messages;
+      const key = msg?.key;
+
+      if (!msg || !key || key.fromMe) return NextResponse.json({ ok: true });
+
+      /* Per WaSender's docs, remoteJid can be a LID rather than a phone number —
+       * cleanedSenderPn/cleanedParticipantPn are the actual phone numbers. */
+      const from = (key.cleanedSenderPn ?? key.cleanedParticipantPn)?.trim();
+      const message = (msg.messageBody ?? "").trim();
 
       if (!from) return NextResponse.json({ ok: true });
 
@@ -58,24 +89,23 @@ export async function POST(req: NextRequest) {
     }
 
     /* ── Message status update → delivery tracking ───────── */
-    if (type === "message_status") {
-      const messageId   = payload.message_id as string | undefined;
-      const statusRaw   = (payload.status    as string | undefined)?.toLowerCase();
+    if (payload.event === "messages.update") {
+      const messageId = payload.data?.key?.id;
+      const statusRaw = payload.data?.update?.status;
 
-      if (!messageId || !statusRaw) return NextResponse.json({ ok: true });
+      if (!messageId || statusRaw === undefined) return NextResponse.json({ ok: true });
 
-      const deliveryStatus =
-        statusRaw === "delivered" ? "delivered" :
-        statusRaw === "read"      ? "delivered" :
-        statusRaw === "sent"      ? "sent"      :
-        statusRaw === "failed"    ? "failed"    : null;
-
+      const deliveryStatus = STATUS_CODE[statusRaw] ?? null;
       if (!deliveryStatus) return NextResponse.json({ ok: true });
 
+      /* NOTE: WaSender's per-message status webhook has no counterpart to match
+       * against here — NotificationRecipient doesn't currently store the
+       * provider's message ID, so this can't be scoped to the specific
+       * recipient this event is about. Left as a known limitation. */
       await prisma.notificationRecipient.updateMany({
-        where: { status: { in: ["pending", "sent"] } },
+        where: { channel: "whatsapp", status: { in: ["pending", "sent"] } },
         data:  {
-          status:      deliveryStatus as "sent" | "delivered" | "failed",
+          status:      deliveryStatus,
           deliveredAt: deliveryStatus === "delivered" ? new Date() : undefined,
         },
       });

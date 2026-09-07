@@ -17,7 +17,7 @@ const envSchema = z.object({
   KENOSIS_SECRET_KEY: z.string().min(1),
   KENOSIS_SENDER_ID: z.string().min(1),
   WASENDER_API_URL: z.string().url(),
-  WASENDER_API_TOKEN: z.string().min(1),
+  WASENDER_API_KEY: z.string().min(1),
   WASENDER_WEBHOOK_SECRET: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
   UPLOAD_DIR: z.string().min(1),

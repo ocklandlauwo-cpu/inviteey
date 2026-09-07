@@ -371,7 +371,7 @@ export function EcardsClient({ eventId, templates, initialInvitees, initialTempl
               <MessageCircle size={18} /> Open WhatsApp <ExternalLink size={14} />
             </a>
             <p className="text-xs text-gray-400 text-center">
-              To enable auto-send, configure <code className="font-mono bg-warm-100 px-1 rounded">WASENDER_API_TOKEN</code> in your environment.
+              To enable auto-send, configure <code className="font-mono bg-warm-100 px-1 rounded">WASENDER_API_KEY</code> in your environment.
             </p>
           </div>
         </div>

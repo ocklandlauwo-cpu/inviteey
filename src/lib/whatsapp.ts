@@ -27,25 +27,30 @@ function normalisePhone(phone: string): string {
 
 /**
  * Send a WhatsApp message.
- * Uses WaSender API if WASENDER_API_TOKEN is set; otherwise returns a wa.me deep link.
+ * Uses WaSender API if WASENDER_API_KEY is set; otherwise returns a wa.me deep link.
  */
 export async function sendWhatsApp({ to, message, imageUrl }: SendWhatsAppOptions): Promise<WhatsAppSendResult> {
-  const token  = process.env.WASENDER_API_TOKEN;
+  const token  = process.env.WASENDER_API_KEY;
   const apiUrl = process.env.WASENDER_API_URL;
 
   if (token && token !== "mock-wasender-token" && apiUrl) {
     try {
       const payload = imageUrl
-        ? { phone: to, message, imageUrl }
-        : { phone: to, message };
+        ? { to, text: message, imageUrl }
+        : { to, text: message };
 
-      await axios.post(`${apiUrl}/send-message`, payload, {
+      const { data } = await axios.post(`${apiUrl}/send-message`, payload, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
-      return { success: true, auto: true };
+
+      if (data?.success === false) {
+        console.error("[whatsapp] WaSender rejected send:", data);
+      } else {
+        return { success: true, auto: true };
+      }
     } catch (e) {
       console.error("[whatsapp] WaSender error:", e);
     }
@@ -99,16 +104,17 @@ export function buildInvitationMessage(opts: {
   return lines.join("\n");
 }
 
-export function verifyWasenderWebhook(
-  rawBody: string,
-  signature: string | null
-): boolean {
-  if (!signature) return false;
-  const expected = crypto
-    .createHmac("sha256", process.env.WASENDER_WEBHOOK_SECRET!)
-    .update(rawBody)
-    .digest("hex");
-  return crypto.timingSafeEqual(new Uint8Array(Buffer.from(signature)), new Uint8Array(Buffer.from(expected)));
+/**
+ * WaSender verifies webhooks via a plain shared-secret comparison in the
+ * X-Webhook-Signature header — not HMAC-signed, per their docs.
+ */
+export function verifyWasenderWebhook(signature: string | null): boolean {
+  const secret = process.env.WASENDER_WEBHOOK_SECRET;
+  if (!signature || !secret) return false;
+  const sigBuf    = Buffer.from(signature);
+  const secretBuf = Buffer.from(secret);
+  if (sigBuf.length !== secretBuf.length) return false;
+  return crypto.timingSafeEqual(new Uint8Array(sigBuf), new Uint8Array(secretBuf));
 }
 
 export function parseRsvpReply(message: string): "yes" | "no" | "unknown" {
