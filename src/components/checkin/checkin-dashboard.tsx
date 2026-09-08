@@ -151,12 +151,21 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
 
   /* The QR code encodes the full check-in URL (https://.../scan/{token}), not
    * a bare token — so it also works when opened with a regular phone camera.
-   * Pull just the token back out for our own API call. */
-  function extractQrToken(decoded: string): string {
+   * Pull just the token back out for our own API call. Returns null when the
+   * scanned code is clearly not one of ours (e.g. a random real-world QR),
+   * so we never forward an arbitrary foreign URL onto our own API path. */
+  function extractQrToken(decoded: string): string | null {
     const marker = "/scan/";
-    const idx = decoded.lastIndexOf(marker);
-    const raw = idx === -1 ? decoded : decoded.slice(idx + marker.length);
-    return raw.split(/[?#]/)[0].replace(/\/+$/, "");
+    try {
+      const url = new URL(decoded);
+      const idx = url.pathname.lastIndexOf(marker);
+      if (idx === -1) return null;
+      return url.pathname.slice(idx + marker.length).replace(/\/+$/, "") || null;
+    } catch {
+      /* Not a URL at all — treat as a bare token (legacy/manual QR content) */
+      const trimmed = decoded.trim();
+      return trimmed || null;
+    }
   }
 
   /* QR scanner via html5-qrcode */
@@ -173,8 +182,12 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
         await scanner.stop();
         setScanMode(false);
         const token = extractQrToken(text);
-        const res   = await fetch(`/api/v1/scan/${token}`, { method: "POST" });
-        const json  = await res.json();
+        if (!token) {
+          setScanResult({ kind: "invalid", message: "Wrong QR Code" });
+          return;
+        }
+        const res  = await fetch(`/api/v1/scan/${encodeURIComponent(token)}`, { method: "POST" });
+        const json = await res.json();
         if (res.ok) {
           setScanResult({ kind: "success", name: json.data?.name, message: "Checked In!" });
           load();
