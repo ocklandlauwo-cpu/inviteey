@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, ScanLine, CreditCard, Bell } from "lucide-react";
+import { Search, ScanLine, CreditCard, Bell, Vote } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ interface EventRow {
   createdAt:                Date;
   ecardAddonActive:         boolean;
   notificationsAddonActive: boolean;
+  rsvpPollEnabled:          boolean;
   organizer: { id: number; name: string; email: string };
   _count:    { invitees: number };
 }
@@ -66,7 +67,7 @@ export function AdminEventsTable({ events: initial }: { events: EventRow[] }) {
   const [updatingStatus,  setUpdatingStatus]  = React.useState<number | null>(null);
   const [togglingAddon,   setTogglingAddon]   = React.useState<string | null>(null);
 
-  async function toggleAddon(eventId: number, field: "ecardAddonActive" | "notificationsAddonActive", current: boolean) {
+  async function toggleAddon(eventId: number, field: "ecardAddonActive" | "notificationsAddonActive" | "rsvpPollEnabled", current: boolean) {
     const key = `${eventId}:${field}`;
     setTogglingAddon(key);
     try {
@@ -274,6 +275,18 @@ export function AdminEventsTable({ events: initial }: { events: EventRow[] }) {
                           }`}
                         >
                           <Bell size={11} /> Notifs
+                        </button>
+                        <button
+                          title="RSVP tap-to-vote poll (sent alongside e-card invitations). When off, guests can still RSVP by replying YES/NO."
+                          disabled={togglingAddon === `${event.id}:rsvpPollEnabled`}
+                          onClick={() => toggleAddon(event.id, "rsvpPollEnabled", event.rsvpPollEnabled)}
+                          className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors ${
+                            event.rsvpPollEnabled
+                              ? "bg-green-50 border-green-200 text-green-700"
+                              : "bg-warm-50 border-warm-200 text-gray-400 hover:border-gray-300"
+                          }`}
+                        >
+                          <Vote size={11} /> RSVP Poll
                         </button>
                       </div>
                     </td>

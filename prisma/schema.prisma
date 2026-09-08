@@ -307,6 +307,7 @@ model Event {
   inviteeLimit             Int         @default(5) @map("invitee_limit")
   ecardAddonActive         Boolean     @default(false) @map("ecard_addon_active")
   notificationsAddonActive Boolean     @default(false) @map("notifications_addon_active")
+  rsvpPollEnabled          Boolean     @default(true)  @map("rsvp_poll_enabled")
   tierActivatedAt          DateTime?   @map("tier_activated_at")
   tierActivatedById        Int?        @map("tier_activated_by")
   deletedAt                DateTime?   @map("deleted_at")

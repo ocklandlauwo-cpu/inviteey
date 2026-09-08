@@ -58,8 +58,10 @@ export async function POST(
     }
 
     /* Follow up with a tap-to-vote RSVP poll — only meaningful over the real
-     * API, since a wa.me deep link can't carry a poll. */
-    if (result.auto) {
+     * API (a wa.me deep link can't carry a poll), and only when the admin
+     * has this enabled for the event. Guests can always fall back to
+     * replying YES/NO as free text regardless of this setting. */
+    if (result.auto && event.rsvpPollEnabled) {
       await sendRsvpPoll(phone, event.name);
     }
 

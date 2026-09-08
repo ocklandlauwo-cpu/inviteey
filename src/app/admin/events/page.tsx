@@ -20,6 +20,7 @@ export default async function AdminEventsPage() {
       createdAt:                true,
       ecardAddonActive:         true,
       notificationsAddonActive: true,
+      rsvpPollEnabled:          true,
       organizer: { select: { id: true, name: true, email: true } },
       _count:    { select: { invitees: { where: { deletedAt: null } } } },
     },

@@ -6,6 +6,7 @@ import { prisma }     from "@/lib/prisma";
 const schema = z.object({
   ecardAddonActive:         z.boolean().optional(),
   notificationsAddonActive: z.boolean().optional(),
+  rsvpPollEnabled:          z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -38,6 +39,7 @@ export async function PATCH(
         id: true,
         ecardAddonActive:         true,
         notificationsAddonActive: true,
+        rsvpPollEnabled:          true,
       },
     });
 
@@ -49,6 +51,7 @@ export async function PATCH(
         oldData:    {
           ecardAddonActive:         event.ecardAddonActive,
           notificationsAddonActive: event.notificationsAddonActive,
+          rsvpPollEnabled:          event.rsvpPollEnabled,
         },
         newData:    parsed.data,
         changedBy: parseInt(user.id, 10),
