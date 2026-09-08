@@ -11,21 +11,23 @@ const postSchema = z.object({
 async function resolveAccess(req: NextRequest, eventId: number) {
   const { user } = await getSession();
   if (user) {
-    if (user.role === "admin") return { userId: parseInt(user.id, 10), organizerId: null };
+    if (user.role === "admin") return { userId: parseInt(user.id, 10), organizerId: null, isStaff: false };
     const event = await prisma.event.findFirst({
       where: { id: eventId, organizerId: parseInt(user.id, 10), deletedAt: null },
     });
-    if (event) return { userId: parseInt(user.id, 10), organizerId: event.organizerId };
+    if (event) return { userId: parseInt(user.id, 10), organizerId: event.organizerId, isStaff: false };
   }
 
-  /* Staff token fallback */
+  /* Staff token fallback — can check guests in, but not revert (see PATCH below) */
   const staffToken = req.headers.get("x-staff-token");
   const staffPin   = req.headers.get("x-staff-pin");
   if (staffToken && staffPin) {
     const staff = await prisma.eventStaff.findFirst({
       where: { accessToken: staffToken, eventId, expiresAt: { gt: new Date() } },
     });
-    if (staff && staff.pin === staffPin) return { userId: staff.organizerId, organizerId: staff.organizerId };
+    if (staff && staff.pin === staffPin) {
+      return { userId: staff.organizerId, organizerId: staff.organizerId, isStaff: true };
+    }
   }
 
   return null;
@@ -149,6 +151,7 @@ export async function PATCH(
 
   const access = await resolveAccess(req, eventId);
   if (!access) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (access.isStaff) return NextResponse.json({ error: "Staff cannot revert a check-in" }, { status: 403 });
 
   const { inviteeId } = await req.json().catch(() => ({}));
   if (!inviteeId) return NextResponse.json({ error: "inviteeId required" }, { status: 400 });

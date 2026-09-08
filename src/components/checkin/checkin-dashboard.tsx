@@ -72,6 +72,10 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
     ? { "x-staff-token": staffToken, "x-staff-pin": staffPin }
     : undefined;
 
+  /* Staff (temporary door-access link) can check guests in, but reverting a
+   * check-in is reserved for admin/organizer. */
+  const isStaff = !!staffToken;
+
   async function load() {
     setLoading(true);
     try {
@@ -413,7 +417,7 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
                           <Badge variant="success" className="text-xs gap-1">
                             <CheckCircle2 size={11} /> In
                           </Badge>
-                          {!readOnly && (
+                          {!readOnly && !isStaff && (
                             <Button
                               size="sm"
                               variant="ghost"
