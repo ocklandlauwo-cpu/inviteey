@@ -146,6 +146,16 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
     }
   }
 
+  /* The QR code encodes the full check-in URL (https://.../scan/{token}), not
+   * a bare token — so it also works when opened with a regular phone camera.
+   * Pull just the token back out for our own API call. */
+  function extractQrToken(decoded: string): string {
+    const marker = "/scan/";
+    const idx = decoded.lastIndexOf(marker);
+    const raw = idx === -1 ? decoded : decoded.slice(idx + marker.length);
+    return raw.split(/[?#]/)[0].replace(/\/+$/, "");
+  }
+
   /* QR scanner via html5-qrcode */
   async function startScanner() {
     setScanMode(true);
@@ -157,10 +167,10 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: 220, height: 220 } },
       async (text: string) => {
-        /* text is the QR token from invitee.qrToken */
         await scanner.stop();
         setScanMode(false);
-        const res  = await fetch(`/api/v1/scan/${text}`, { method: "POST" });
+        const token = extractQrToken(text);
+        const res   = await fetch(`/api/v1/scan/${token}`, { method: "POST" });
         const json = await res.json();
         if (res.ok) {
           toast({ title: `${json.data?.name ?? "Guest"} checked in via QR!` });
