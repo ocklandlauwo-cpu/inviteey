@@ -212,7 +212,7 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
   /* Auto-dismiss the scan result popup so staff can keep scanning back-to-back */
   React.useEffect(() => {
     if (!scanResult) return;
-    const t = setTimeout(() => setScanResult(null), 2500);
+    const t = setTimeout(() => setScanResult(null), 10000);
     return () => clearTimeout(t);
   }, [scanResult]);
 
