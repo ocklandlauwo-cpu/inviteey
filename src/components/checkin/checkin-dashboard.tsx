@@ -60,6 +60,9 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
   const [checking,   setChecking]   = React.useState<number | null>(null);
   const [reverting,  setReverting]  = React.useState<number | null>(null);
   const [scanMode,   setScanMode]   = React.useState(false);
+  const [scanResult, setScanResult] = React.useState<
+    { kind: "success" | "already" | "invalid"; name?: string; message: string } | null
+  >(null);
   const [pin,        setPin]        = React.useState("");
   const [pinBusy,    setPinBusy]    = React.useState(false);
   const [pinResult,  setPinResult]  = React.useState<{ ok: boolean; msg: string } | null>(null);
@@ -171,12 +174,14 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
         setScanMode(false);
         const token = extractQrToken(text);
         const res   = await fetch(`/api/v1/scan/${token}`, { method: "POST" });
-        const json = await res.json();
+        const json  = await res.json();
         if (res.ok) {
-          toast({ title: `${json.data?.name ?? "Guest"} checked in via QR!` });
+          setScanResult({ kind: "success", name: json.data?.name, message: "Checked In!" });
           load();
+        } else if (res.status === 409) {
+          setScanResult({ kind: "already", name: json.data?.name, message: json.error ?? "Already Checked In" });
         } else {
-          toast({ title: json.error ?? "QR check-in failed", variant: "destructive" });
+          setScanResult({ kind: "invalid", message: json.error ?? "Wrong QR Code" });
         }
       },
       () => {/* scan error — ignore */ }
@@ -191,6 +196,13 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
   }
 
   React.useEffect(() => () => { stopScanner(); }, []);
+
+  /* Auto-dismiss the scan result popup so staff can keep scanning back-to-back */
+  React.useEffect(() => {
+    if (!scanResult) return;
+    const t = setTimeout(() => setScanResult(null), 2500);
+    return () => clearTimeout(t);
+  }, [scanResult]);
 
   async function checkInByPin(e: React.FormEvent) {
     e.preventDefault();
@@ -437,6 +449,32 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
           </>
         )}
       </div>
+
+      {/* Scan result popup */}
+      {scanResult && (
+        <div
+          className="fixed inset-0 z-50 bg-gray-900/60 flex items-center justify-center p-4"
+          onClick={() => setScanResult(null)}
+        >
+          <div
+            className={`w-full max-w-xs rounded-3xl shadow-2xl p-8 text-center ${
+              scanResult.kind === "success" ? "bg-green-50 border-2 border-green-300" : "bg-red-50 border-2 border-red-300"
+            }`}
+          >
+            {scanResult.kind === "success" ? (
+              <CheckCircle2 size={64} className="mx-auto text-green-500 mb-4" />
+            ) : (
+              <XCircle size={64} className="mx-auto text-red-500 mb-4" />
+            )}
+            {scanResult.name && (
+              <p className="font-extrabold text-xl text-gray-900 mb-1">{scanResult.name}</p>
+            )}
+            <p className={`font-semibold ${scanResult.kind === "success" ? "text-green-700" : "text-red-600"}`}>
+              {scanResult.kind === "invalid" ? "Wrong QR Code" : scanResult.message}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 

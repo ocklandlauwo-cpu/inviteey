@@ -22,7 +22,10 @@ export async function POST(
 
     if (invitee.checkinCount >= max) {
       return NextResponse.json(
-        { error: max === 2 ? "Both seats already checked in" : "Already checked in" },
+        {
+          error: max === 2 ? "Both seats already checked in" : "Already checked in",
+          data:  { name: invitee.name },
+        },
         { status: 409 }
       );
     }
