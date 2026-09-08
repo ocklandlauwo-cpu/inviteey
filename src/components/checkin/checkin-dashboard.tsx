@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   CheckCircle2, XCircle, Users, Search, RefreshCw,
-  Loader2, QrCode, ScanLine, UserCheck, Undo2, KeyRound,
+  Loader2, QrCode, ScanLine, UserCheck, Undo2, KeyRound, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input }  from "@/components/ui/input";
@@ -65,7 +65,6 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
   >(null);
   const [pin,        setPin]        = React.useState("");
   const [pinBusy,    setPinBusy]    = React.useState(false);
-  const [pinResult,  setPinResult]  = React.useState<{ ok: boolean; msg: string } | null>(null);
   const scannerRef  = React.useRef<HTMLDivElement>(null);
   const scannerInst = React.useRef<unknown>(null);
 
@@ -219,9 +218,8 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
 
   async function checkInByPin(e: React.FormEvent) {
     e.preventDefault();
-    if (pin.trim().length !== 6) { setPinResult({ ok: false, msg: "Enter a 6-digit PIN" }); return; }
+    if (pin.trim().length !== 6) return;
     setPinBusy(true);
-    setPinResult(null);
     try {
       const res  = await fetch("/api/v1/scan/pin", {
         method:  "POST",
@@ -229,16 +227,17 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
         body:    JSON.stringify({ pin: pin.trim(), eventId }),
       });
       const json = await res.json();
-      if (!res.ok) {
-        setPinResult({ ok: false, msg: json.error ?? "PIN check-in failed" });
-        return;
+      if (res.ok) {
+        setScanResult({ kind: "success", name: json.data?.name, message: "Checked In!" });
+        setPin("");
+        load();
+      } else if (res.status === 409) {
+        setScanResult({ kind: "already", name: json.data?.name, message: json.error ?? "Already Checked In" });
+      } else {
+        setScanResult({ kind: "invalid", message: json.error ?? "Wrong PIN" });
       }
-      const name = json.data?.name ?? "Guest";
-      setPinResult({ ok: true, msg: `${name} checked in!` });
-      setPin("");
-      load();
     } catch {
-      setPinResult({ ok: false, msg: "Network error. Please try again." });
+      setScanResult({ kind: "invalid", message: "Network error. Please try again." });
     } finally {
       setPinBusy(false);
     }
@@ -329,7 +328,7 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
           <form onSubmit={checkInByPin} className="flex gap-2">
             <Input
               value={pin}
-              onChange={e => { setPin(e.target.value.replace(/\D/g, "").slice(0, 6)); setPinResult(null); }}
+              onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="6-digit PIN"
               inputMode="numeric"
               maxLength={6}
@@ -344,12 +343,6 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
               Check In
             </Button>
           </form>
-          {pinResult && (
-            <p className={`text-sm font-medium flex items-center gap-1.5 ${pinResult.ok ? "text-green-600" : "text-red-500"}`}>
-              {pinResult.ok ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-              {pinResult.msg}
-            </p>
-          )}
           <p className="text-xs text-gray-400">For guests who cannot scan a QR code</p>
         </div>
       )}
@@ -470,10 +463,18 @@ export function CheckinDashboard({ eventId, staffToken, staffPin, readOnly = fal
           onClick={() => setScanResult(null)}
         >
           <div
-            className={`w-full max-w-xs rounded-3xl shadow-2xl p-8 text-center ${
+            onClick={e => e.stopPropagation()}
+            className={`relative w-full max-w-xs rounded-3xl shadow-2xl p-8 text-center ${
               scanResult.kind === "success" ? "bg-green-50 border-2 border-green-300" : "bg-red-50 border-2 border-red-300"
             }`}
           >
+            <button
+              onClick={() => setScanResult(null)}
+              aria-label="Close"
+              className="absolute top-3 right-3 p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors"
+            >
+              <X size={18} />
+            </button>
             {scanResult.kind === "success" ? (
               <CheckCircle2 size={64} className="mx-auto text-green-500 mb-4" />
             ) : (
