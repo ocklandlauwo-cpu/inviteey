@@ -29,7 +29,9 @@ export async function PATCH(
     }
 
     const invitee = await prisma.invitee.findFirst({
-      where: { id: inviteeId, eventId, organizerId: userId, deletedAt: null },
+      where: user.role === "admin"
+        ? { id: inviteeId, eventId, deletedAt: null }
+        : { id: inviteeId, eventId, organizerId: userId, deletedAt: null },
     });
     if (!invitee) return NextResponse.json({ error: "Guest not found" }, { status: 404 });
 
@@ -76,9 +78,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
     }
 
-    /* Verify ownership */
+    /* Verify ownership (or admin) */
     const invitee = await prisma.invitee.findFirst({
-      where: { id: inviteeId, eventId, organizerId: userId, deletedAt: null },
+      where: user.role === "admin"
+        ? { id: inviteeId, eventId, deletedAt: null }
+        : { id: inviteeId, eventId, organizerId: userId, deletedAt: null },
     });
     if (!invitee) return NextResponse.json({ error: "Guest not found" }, { status: 404 });
 

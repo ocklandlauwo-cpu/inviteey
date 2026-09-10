@@ -34,7 +34,9 @@ export async function PATCH(
 
     const userId = parseInt(user.id, 10);
     const event  = await prisma.event.findFirst({
-      where: { id: eventId, organizerId: userId, deletedAt: null },
+      where: user.role === "admin"
+        ? { id: eventId, deletedAt: null }
+        : { id: eventId, organizerId: userId, deletedAt: null },
     });
     if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
@@ -67,7 +69,9 @@ export async function DELETE(
 
     const userId = parseInt(user.id, 10);
     const event  = await prisma.event.findFirst({
-      where: { id: eventId, organizerId: userId, deletedAt: null },
+      where: user.role === "admin"
+        ? { id: eventId, deletedAt: null }
+        : { id: eventId, organizerId: userId, deletedAt: null },
     });
     if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 

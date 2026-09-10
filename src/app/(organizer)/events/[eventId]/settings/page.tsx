@@ -12,7 +12,9 @@ export default async function EventSettingsPage({ params }: { params: { eventId:
   if (isNaN(eventId)) notFound();
 
   const event = await prisma.event.findFirst({
-    where: { id: eventId, organizerId: userId, deletedAt: null },
+    where: user.role === "admin"
+      ? { id: eventId, deletedAt: null }
+      : { id: eventId, organizerId: userId, deletedAt: null },
   });
   if (!event) notFound();
 

@@ -21,9 +21,11 @@ async function generateUniquePin(eventId: number): Promise<string> {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-async function getEventForOrganizer(eventId: number, userId: number) {
+async function getEventForOrganizer(eventId: number, userId: number, isAdmin: boolean) {
   return prisma.event.findFirst({
-    where: { id: eventId, organizerId: userId, deletedAt: null },
+    where: isAdmin
+      ? { id: eventId, deletedAt: null }
+      : { id: eventId, organizerId: userId, deletedAt: null },
   });
 }
 
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { eventId: str
     const eventId = parseInt(params.eventId, 10);
     if (isNaN(eventId)) return NextResponse.json({ error: "Invalid event" }, { status: 400 });
 
-    const event = await getEventForOrganizer(eventId, userId);
+    const event = await getEventForOrganizer(eventId, userId, user.role === "admin");
     if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
     const invitees = await prisma.invitee.findMany({
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { eventId: st
     const eventId = parseInt(params.eventId, 10);
     if (isNaN(eventId)) return NextResponse.json({ error: "Invalid event" }, { status: 400 });
 
-    const event = await getEventForOrganizer(eventId, userId);
+    const event = await getEventForOrganizer(eventId, userId, user.role === "admin");
     if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
     /* Enforce tier limit */
