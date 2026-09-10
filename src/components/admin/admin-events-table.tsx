@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, ScanLine, CreditCard, Bell, Vote } from "lucide-react";
+import { Search, ScanLine, CreditCard, Bell, Vote, Pencil, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -291,11 +291,23 @@ export function AdminEventsTable({ events: initial }: { events: EventRow[] }) {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7" asChild>
-                        <Link href={`/admin/checkin/${event.id}`}>
-                          <ScanLine size={12} /> Check-in
-                        </Link>
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7" asChild>
+                          <Link href={`/events/${event.id}/settings`}>
+                            <Pencil size={12} /> Edit
+                          </Link>
+                        </Button>
+                        <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7" asChild>
+                          <Link href={`/events/${event.id}/invitees`}>
+                            <Users size={12} /> Guests
+                          </Link>
+                        </Button>
+                        <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7" asChild>
+                          <Link href={`/admin/checkin/${event.id}`}>
+                            <ScanLine size={12} /> Check-in
+                          </Link>
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
