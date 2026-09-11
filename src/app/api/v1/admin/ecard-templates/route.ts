@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     const qrX       = parseInt((form.get("qrX")    as string) ?? "650", 10);
     const qrY       = parseInt((form.get("qrY")    as string) ?? "550", 10);
     const qrSize    = parseInt((form.get("qrSize") as string) ?? "180", 10);
+    const qrEnabled = (form.get("qrEnabled") as string | null) !== "false";
     const file      = form.get("image") as File | null;
     const textFieldsRaw = form.get("textFields") as string | null;
     let textFields: unknown[] = [];
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
         imagePath:     filename,
         thumbnailPath: `thumbnails/${thumbFilename}`,
         qrPosition:    { x: qrX, y: qrY, size: qrSize },
+        qrEnabled,
         textFields:    JSON.parse(JSON.stringify(textFields)),
         isActive:      true,
       },

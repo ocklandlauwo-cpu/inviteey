@@ -39,6 +39,7 @@ async function processEcard(job: Job<EcardJobData>) {
   const buffer = await generateEcardBuffer({
     templateImagePath: template.imagePath,
     qrPosition:         template.qrPosition as { x?: number; y?: number; size?: number } | null,
+    qrEnabled:          template.qrEnabled,
     textFields:         template.textFields as EcardTextField[] | null,
     qrUrl:              `${APP_URL}/scan/${invitee.qrToken}`,
     invitee:            { name: invitee.name, category: invitee.category },

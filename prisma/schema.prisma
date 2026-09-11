@@ -391,6 +391,7 @@ model EcardTemplate {
   thumbnailPath String?   @map("thumbnail_path") @db.VarChar(500)
   textFields    Json?     @map("text_fields")
   qrPosition    Json?     @map("qr_position")
+  qrEnabled     Boolean   @default(true) @map("qr_enabled")
   isActive      Boolean   @default(true) @map("is_active")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")

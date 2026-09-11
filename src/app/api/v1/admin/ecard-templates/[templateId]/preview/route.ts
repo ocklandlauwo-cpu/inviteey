@@ -25,6 +25,7 @@ export async function POST(
     const buffer = await generateEcardBuffer({
       templateImagePath: template.imagePath,
       qrPosition:         template.qrPosition as { x?: number; y?: number; size?: number } | null,
+      qrEnabled:          template.qrEnabled,
       textFields:         template.textFields as EcardTextField[] | null,
       qrUrl:              `${APP_URL}/scan/preview`,
       invitee:            { name: "John Doe", category: "family" },

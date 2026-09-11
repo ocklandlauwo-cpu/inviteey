@@ -52,6 +52,7 @@ interface EcardTemplate {
   imagePath:     string;
   thumbnailPath: string | null;
   qrPosition:    { x: number; y: number; size: number } | null;
+  qrEnabled:     boolean;
   textFields:    unknown[] | null;
   isActive:      boolean;
   createdAt:     string;
@@ -73,7 +74,7 @@ export default function AdminEcardTemplatesPage() {
   const fileRef   = React.useRef<HTMLInputElement>(null);
   const [preview, setPreview] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({
-    name: "", eventType: "wedding", qrX: "650", qrY: "550", qrSize: "180",
+    name: "", eventType: "wedding", qrX: "650", qrY: "550", qrSize: "180", qrEnabled: true,
   });
 
   async function load() {
@@ -118,7 +119,7 @@ export default function AdminEcardTemplatesPage() {
   function resetForm() {
     setShowForm(false);
     setEditingId(null);
-    setForm({ name: "", eventType: "wedding", qrX: "650", qrY: "550", qrSize: "180" });
+    setForm({ name: "", eventType: "wedding", qrX: "650", qrY: "550", qrSize: "180", qrEnabled: true });
     setTextFields([]);
     setPreview(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -132,6 +133,7 @@ export default function AdminEcardTemplatesPage() {
       qrX:       String(tpl.qrPosition?.x    ?? 650),
       qrY:       String(tpl.qrPosition?.y    ?? 550),
       qrSize:    String(tpl.qrPosition?.size ?? 180),
+      qrEnabled: tpl.qrEnabled ?? true,
     });
     const existing = (tpl.textFields as Partial<TextFieldEntry>[] | null) ?? [];
     setTextFields(existing.map((f, i) => ({
@@ -178,6 +180,7 @@ export default function AdminEcardTemplatesPage() {
             qrX:        parseInt(form.qrX, 10)    || 0,
             qrY:        parseInt(form.qrY, 10)    || 0,
             qrSize:     parseInt(form.qrSize, 10) || 0,
+            qrEnabled:  form.qrEnabled,
             textFields: buildTextFieldsPayload(),
           }),
         });
@@ -195,6 +198,7 @@ export default function AdminEcardTemplatesPage() {
         fd.append("qrX",        form.qrX);
         fd.append("qrY",        form.qrY);
         fd.append("qrSize",     form.qrSize);
+        fd.append("qrEnabled",  String(form.qrEnabled));
         fd.append("textFields", JSON.stringify(buildTextFieldsPayload()));
 
         const res  = await fetch("/api/v1/admin/ecard-templates", { method: "POST", body: fd });
@@ -326,24 +330,38 @@ export default function AdminEcardTemplatesPage() {
               </p>
             )}
 
-            {/* QR code position */}
-            <div className="space-y-2">
-              <Label>QR Code Position <span className="text-gray-400 font-normal text-xs">(pixels from top-left of the template image)</span></Label>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 w-8">X</span>
-                  <Input type="number" className="w-24" value={form.qrX} onChange={e => setForm(f => ({ ...f, qrX: e.target.value }))} />
+            {/* QR code toggle + position */}
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.qrEnabled}
+                  onChange={e => setForm(f => ({ ...f, qrEnabled: e.target.checked }))}
+                  className="rounded"
+                />
+                Include QR code on this template
+              </label>
+
+              {form.qrEnabled && (
+                <div className="space-y-2">
+                  <Label>QR Code Position <span className="text-gray-400 font-normal text-xs">(pixels from top-left of the template image)</span></Label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-8">X</span>
+                      <Input type="number" className="w-24" value={form.qrX} onChange={e => setForm(f => ({ ...f, qrX: e.target.value }))} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-8">Y</span>
+                      <Input type="number" className="w-24" value={form.qrY} onChange={e => setForm(f => ({ ...f, qrY: e.target.value }))} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-10">Size</span>
+                      <Input type="number" className="w-24" value={form.qrSize} onChange={e => setForm(f => ({ ...f, qrSize: e.target.value }))} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">Default: X=650 Y=550 Size=180. Open the template image in an editor to find the exact pixel coordinates.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 w-8">Y</span>
-                  <Input type="number" className="w-24" value={form.qrY} onChange={e => setForm(f => ({ ...f, qrY: e.target.value }))} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 w-10">Size</span>
-                  <Input type="number" className="w-24" value={form.qrSize} onChange={e => setForm(f => ({ ...f, qrSize: e.target.value }))} />
-                </div>
-              </div>
-              <p className="text-xs text-gray-400">Default: X=650 Y=550 Size=180. Open the template image in an editor to find the exact pixel coordinates.</p>
+              )}
             </div>
 
             {/* Text overlays */}

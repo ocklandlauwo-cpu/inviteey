@@ -48,6 +48,7 @@ function escapeXml(str: string) {
 export interface GenerateEcardOptions {
   templateImagePath: string; // bare filename under uploads/templates/
   qrPosition:        { x?: number; y?: number; size?: number } | null;
+  qrEnabled?:         boolean;
   textFields:        EcardTextField[] | null;
   qrUrl:              string;
   invitee:            { name: string; category: string };
@@ -58,22 +59,26 @@ export interface GenerateEcardOptions {
  *  the real generation worker and the admin template preview endpoint, so
  *  both always render identically. */
 export async function generateEcardBuffer(opts: GenerateEcardOptions): Promise<Buffer> {
-  const qrData = await QRCode.toBuffer(opts.qrUrl, {
-    type:                 "png",
-    width:                200,
-    margin:               2,
-    color:                { dark: "#1C1917", light: "#FFFFFF" },
-    errorCorrectionLevel: "M",
-  });
+  const qrEnabled = opts.qrEnabled !== false;
 
   const templatePath = path.resolve(UPLOADS_DIR, "templates", opts.templateImagePath);
 
-  const qrPos  = opts.qrPosition ?? {};
-  const qrX    = qrPos.x    ?? 650;
-  const qrY    = qrPos.y    ?? 550;
-  const qrSize = qrPos.size ?? 180;
+  let qrResized: Buffer | null = null;
 
-  const qrResized = await sharp(qrData).resize(qrSize, qrSize).toBuffer();
+  if (qrEnabled) {
+    const qrData = await QRCode.toBuffer(opts.qrUrl, {
+      type:                 "png",
+      width:                200,
+      margin:               2,
+      color:                { dark: "#1C1917", light: "#FFFFFF" },
+      errorCorrectionLevel: "M",
+    });
+
+    const qrPos  = opts.qrPosition ?? {};
+    const qrSize = qrPos.size ?? 180;
+
+    qrResized = await sharp(qrData).resize(qrSize, qrSize).toBuffer();
+  }
 
   const { width: imgW = 800, height: imgH = 1000 } = await sharp(templatePath).metadata();
 
@@ -112,11 +117,17 @@ export async function generateEcardBuffer(opts: GenerateEcardOptions): Promise<B
     };
   }
 
+  const composites: sharp.OverlayOptions[] = [];
+
+  if (qrResized) {
+    const qrPos = opts.qrPosition ?? {};
+    composites.push({ input: qrResized, top: qrPos.y ?? 550, left: qrPos.x ?? 650 });
+  }
+
+  composites.push(textOverlay);
+
   return sharp(templatePath)
-    .composite([
-      { input: qrResized, top: qrY, left: qrX },
-      textOverlay,
-    ])
+    .composite(composites)
     .jpeg({ quality: 88 })
     .toBuffer();
 }

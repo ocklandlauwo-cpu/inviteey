@@ -32,6 +32,7 @@ export async function PATCH(
 
     if (typeof body.name      === "string")  data.name      = body.name.trim();
     if (typeof body.isActive  === "boolean") data.isActive  = body.isActive;
+    if (typeof body.qrEnabled === "boolean") data.qrEnabled = body.qrEnabled;
     if (typeof body.eventType === "string" && VALID_EVENT_TYPES.includes(body.eventType as EventType)) {
       data.eventType = body.eventType;
     }
