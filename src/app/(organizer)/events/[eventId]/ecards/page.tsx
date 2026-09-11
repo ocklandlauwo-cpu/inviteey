@@ -15,7 +15,9 @@ export default async function EcardsPage({ params }: { params: { eventId: string
   if (isNaN(eventId)) notFound();
 
   const event = await prisma.event.findFirst({
-    where: { id: eventId, organizerId: userId, deletedAt: null },
+    where: user.role === "admin"
+      ? { id: eventId, deletedAt: null }
+      : { id: eventId, organizerId: userId, deletedAt: null },
   });
   if (!event) notFound();
 
@@ -65,6 +67,7 @@ export default async function EcardsPage({ params }: { params: { eventId: string
         templates={templates}
         initialInvitees={invitees}
         initialTemplateId={event.ecardTemplateId}
+        isAdmin={user.role === "admin"}
       />
     </div>
   );

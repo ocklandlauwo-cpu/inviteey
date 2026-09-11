@@ -34,7 +34,14 @@ interface Props {
   templates:         EcardTemplate[];
   initialInvitees:   InviteeRow[];
   initialTemplateId: number | null;
+  isAdmin?:          boolean;
 }
+
+type WhatsAppVendor = "wasender" | "authkey";
+const VENDOR_LABELS: Record<WhatsAppVendor, string> = {
+  wasender: "WaSender",
+  authkey:  "AuthKey.io",
+};
 
 const STATUS_BADGE: Record<string, "secondary" | "info" | "success" | "error"> = {
   pending:    "secondary",
@@ -50,10 +57,11 @@ const STATUS_ICON: Record<string, React.ElementType> = {
   failed:     XCircle,
 };
 
-export function EcardsClient({ eventId, templates, initialInvitees, initialTemplateId }: Props) {
+export function EcardsClient({ eventId, templates, initialInvitees, initialTemplateId, isAdmin }: Props) {
   const { toast } = useToast();
   const [invitees, setInvitees]             = React.useState(initialInvitees);
   const [selectedTemplate, setTemplate]     = React.useState<number | null>(initialTemplateId);
+  const [vendor,       setVendor]           = React.useState<WhatsAppVendor>("wasender");
   const [generating,   setGenerating]       = React.useState(false);
   const [refreshing,   setRefreshing]       = React.useState(false);
   const [rowBusy,      setRowBusy]          = React.useState<number | null>(null);
@@ -111,13 +119,13 @@ export function EcardsClient({ eventId, templates, initialInvitees, initialTempl
       const res  = await fetch(`/api/v1/events/${eventId}/ecards/send`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ inviteeId: inv.id }),
+        body:    JSON.stringify({ inviteeId: inv.id, vendor }),
       });
       const json = await res.json();
       if (!res.ok) { toast({ title: json.error ?? "Send failed", variant: "destructive" }); return; }
 
       if (json.auto) {
-        toast({ title: `E-card sent to ${inv.name} via WhatsApp` });
+        toast({ title: `E-card sent to ${inv.name} via WhatsApp (${VENDOR_LABELS[json.vendor as WhatsAppVendor] ?? json.vendor})` });
         await refresh();
       } else if (json.deepLink) {
         setDeepLink({ name: inv.name, url: json.deepLink });
@@ -178,9 +186,24 @@ export function EcardsClient({ eventId, templates, initialInvitees, initialTempl
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-gray-500">{invitees.length} guest{invitees.length !== 1 ? "s" : ""}</p>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="wa-vendor" className="text-xs text-gray-500 font-medium">WhatsApp via</label>
+              <select
+                id="wa-vendor"
+                value={vendor}
+                onChange={e => setVendor(e.target.value as WhatsAppVendor)}
+                className="text-xs font-medium border border-warm-200 rounded-lg px-2 py-1.5 text-gray-700 bg-white"
+              >
+                {(Object.keys(VENDOR_LABELS) as WhatsAppVendor[]).map(v => (
+                  <option key={v} value={v}>{VENDOR_LABELS[v]}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <Button size="sm" variant="outline" className="gap-2" onClick={refresh} disabled={refreshing}>
             {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             Refresh

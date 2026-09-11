@@ -16,7 +16,9 @@ export async function GET(
     if (isNaN(eventId)) return NextResponse.json({ error: "Invalid event ID" }, { status: 400 });
 
     const event = await prisma.event.findFirst({
-      where: { id: eventId, organizerId: userId, deletedAt: null },
+      where: user.role === "admin"
+        ? { id: eventId, deletedAt: null }
+        : { id: eventId, organizerId: userId, deletedAt: null },
     });
     if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
