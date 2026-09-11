@@ -10,6 +10,10 @@ interface SendWhatsAppOptions {
   message:   string;
   imageUrl?: string;
   vendor?:   WhatsAppVendor; // defaults to "wasender"
+  /** AuthKey only — the registered template's `wid`. Falls back to AUTHKEY_WHATSAPP_TEMPLATE_ID if omitted. */
+  authkeyTemplateId?:     string;
+  /** AuthKey only — whether the chosen template has an image header (attaches imageUrl there). */
+  authkeyHasImageHeader?: boolean;
 }
 
 export interface WhatsAppSendResult {
@@ -80,10 +84,12 @@ async function sendWhatsAppViaWasender({ to, message, imageUrl }: SendWhatsAppOp
  *
  * Returns null when unconfigured (caller falls back to deep link).
  */
-async function sendWhatsAppViaAuthkey({ to, message, imageUrl }: SendWhatsAppOptions): Promise<WhatsAppSendResult | null> {
+async function sendWhatsAppViaAuthkey({
+  to, message, imageUrl, authkeyTemplateId, authkeyHasImageHeader,
+}: SendWhatsAppOptions): Promise<WhatsAppSendResult | null> {
   const apiKey     = process.env.AUTHKEY_API_KEY;
   const apiUrl     = process.env.AUTHKEY_API_URL ?? "https://console.authkey.io/restapi/requestjson.php";
-  const templateId = process.env.AUTHKEY_WHATSAPP_TEMPLATE_ID;
+  const templateId = authkeyTemplateId || process.env.AUTHKEY_WHATSAPP_TEMPLATE_ID;
 
   if (!apiKey || apiKey === "mock-authkey-token" || !templateId) return null;
 
@@ -98,7 +104,7 @@ async function sendWhatsAppViaAuthkey({ to, message, imageUrl }: SendWhatsAppOpt
       type:         "text",
       bodyValues:   { var1: message },
     };
-    if (imageUrl) {
+    if (imageUrl && authkeyHasImageHeader) {
       payload.headerValues = { headerData: imageUrl };
     }
 
@@ -126,9 +132,10 @@ async function sendWhatsAppViaAuthkey({ to, message, imageUrl }: SendWhatsAppOpt
  * Falls back to a wa.me deep link (manual send) when the chosen vendor
  * isn't configured or the send fails.
  */
-export async function sendWhatsApp({ to, message, imageUrl, vendor = "wasender" }: SendWhatsAppOptions): Promise<WhatsAppSendResult> {
+export async function sendWhatsApp(opts: SendWhatsAppOptions): Promise<WhatsAppSendResult> {
+  const { to, message, imageUrl, vendor = "wasender" } = opts;
   const result = vendor === "authkey"
-    ? await sendWhatsAppViaAuthkey({ to, message, imageUrl })
+    ? await sendWhatsAppViaAuthkey(opts)
     : await sendWhatsAppViaWasender({ to, message, imageUrl });
 
   if (result) return result;

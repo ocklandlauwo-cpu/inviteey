@@ -43,6 +43,14 @@ const VENDOR_LABELS: Record<WhatsAppVendor, string> = {
   authkey:  "AuthKey.io",
 };
 
+type WhatsappTemplateRow = {
+  id:             number;
+  name:           string;
+  wid:            string;
+  hasImageHeader: boolean;
+  isActive:       boolean;
+};
+
 const STATUS_BADGE: Record<string, "secondary" | "info" | "success" | "error"> = {
   pending:    "secondary",
   processing: "info",
@@ -62,6 +70,9 @@ export function EcardsClient({ eventId, templates, initialInvitees, initialTempl
   const [invitees, setInvitees]             = React.useState(initialInvitees);
   const [selectedTemplate, setTemplate]     = React.useState<number | null>(initialTemplateId);
   const [vendor,       setVendor]           = React.useState<WhatsAppVendor>("wasender");
+  const [waTemplates,      setWaTemplates]      = React.useState<WhatsappTemplateRow[]>([]);
+  const [waTemplatesLoaded, setWaTemplatesLoaded] = React.useState(false);
+  const [selectedWaTemplate, setSelectedWaTemplate] = React.useState<number | null>(null);
   const [generating,   setGenerating]       = React.useState(false);
   const [refreshing,   setRefreshing]       = React.useState(false);
   const [rowBusy,      setRowBusy]          = React.useState<number | null>(null);
@@ -73,6 +84,23 @@ export function EcardsClient({ eventId, templates, initialInvitees, initialTempl
   const totalPages  = Math.max(1, Math.ceil(invitees.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paged       = invitees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  React.useEffect(() => {
+    if (vendor !== "authkey" || waTemplatesLoaded || !isAdmin) return;
+    (async () => {
+      try {
+        const res  = await fetch("/api/v1/admin/whatsapp-templates");
+        const json = await res.json();
+        if (res.ok) {
+          const active = (json.data as WhatsappTemplateRow[]).filter(t => t.isActive);
+          setWaTemplates(active);
+          if (active.length > 0) setSelectedWaTemplate(active[0].id);
+        }
+      } catch { /* silent */ } finally {
+        setWaTemplatesLoaded(true);
+      }
+    })();
+  }, [vendor, waTemplatesLoaded, isAdmin]);
 
   async function refresh() {
     setRefreshing(true);
@@ -114,12 +142,16 @@ export function EcardsClient({ eventId, templates, initialInvitees, initialTempl
       toast({ title: "No phone number for this guest", variant: "destructive" });
       return;
     }
+    if (vendor === "authkey" && !selectedWaTemplate) {
+      toast({ title: "Select a WhatsApp template first", variant: "destructive" });
+      return;
+    }
     setSending(inv.id);
     try {
       const res  = await fetch(`/api/v1/events/${eventId}/ecards/send`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ inviteeId: inv.id, vendor }),
+        body:    JSON.stringify({ inviteeId: inv.id, vendor, whatsappTemplateId: selectedWaTemplate }),
       });
       const json = await res.json();
       if (!res.ok) { toast({ title: json.error ?? "Send failed", variant: "destructive" }); return; }
@@ -202,6 +234,28 @@ export function EcardsClient({ eventId, templates, initialInvitees, initialTempl
                   <option key={v} value={v}>{VENDOR_LABELS[v]}</option>
                 ))}
               </select>
+            </div>
+          )}
+          {isAdmin && vendor === "authkey" && (
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="wa-template" className="text-xs text-gray-500 font-medium">Template</label>
+              {waTemplatesLoaded && waTemplates.length === 0 ? (
+                <span className="text-xs text-red-500">
+                  None registered —{" "}
+                  <a href="/admin/whatsapp-templates" className="underline">add one</a>
+                </span>
+              ) : (
+                <select
+                  id="wa-template"
+                  value={selectedWaTemplate ?? ""}
+                  onChange={e => setSelectedWaTemplate(Number(e.target.value))}
+                  className="text-xs font-medium border border-warm-200 rounded-lg px-2 py-1.5 text-gray-700 bg-white max-w-[180px]"
+                >
+                  {waTemplates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
           <Button size="sm" variant="outline" className="gap-2" onClick={refresh} disabled={refreshing}>

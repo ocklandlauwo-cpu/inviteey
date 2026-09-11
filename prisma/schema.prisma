@@ -383,6 +383,22 @@ model Invitee {
   @@map("invitees")
 }
 
+/// Admin-managed registry of AuthKey.io WhatsApp templates (`wid` values).
+/// AuthKey publishes no API to list templates programmatically — templates
+/// are created/approved in the AuthKey dashboard, then registered here once
+/// so they can be picked from a dropdown when sending invitations.
+model WhatsappTemplate {
+  id             Int      @id @default(autoincrement())
+  name           String   @db.VarChar(200)
+  wid            String   @db.VarChar(100)
+  hasImageHeader Boolean  @default(false) @map("has_image_header")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("whatsapp_templates")
+}
+
 model EcardTemplate {
   id            Int       @id @default(autoincrement())
   name          String    @db.VarChar(200)

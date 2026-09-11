@@ -27,7 +27,7 @@ export async function POST(
     });
     if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-    const body      = await req.json().catch(() => ({})) as { inviteeId?: number; vendor?: string };
+    const body      = await req.json().catch(() => ({})) as { inviteeId?: number; vendor?: string; whatsappTemplateId?: number };
     const inviteeId = body.inviteeId;
     if (!inviteeId) return NextResponse.json({ error: "inviteeId required" }, { status: 400 });
 
@@ -36,6 +36,21 @@ export async function POST(
       user.role === "admin" && body.vendor && VALID_VENDORS.includes(body.vendor as WhatsAppVendor)
         ? (body.vendor as WhatsAppVendor)
         : "wasender";
+
+    /* AuthKey requires an approved, registered template — resolve it up front. */
+    let authkeyTemplateId: string | undefined;
+    let authkeyHasImageHeader = false;
+    if (vendor === "authkey") {
+      if (!body.whatsappTemplateId) {
+        return NextResponse.json({ error: "Select a WhatsApp template first" }, { status: 400 });
+      }
+      const template = await prisma.whatsappTemplate.findFirst({
+        where: { id: body.whatsappTemplateId, isActive: true },
+      });
+      if (!template) return NextResponse.json({ error: "WhatsApp template not found" }, { status: 404 });
+      authkeyTemplateId     = template.wid;
+      authkeyHasImageHeader = template.hasImageHeader;
+    }
 
     const invitee = await prisma.invitee.findFirst({
       where:   { id: inviteeId, eventId, deletedAt: null },
@@ -58,7 +73,10 @@ export async function POST(
       ecardUrl,
     });
 
-    const result = await sendWhatsApp({ to: phone, message, imageUrl: ecardUrl, vendor });
+    const result = await sendWhatsApp({
+      to: phone, message, imageUrl: ecardUrl, vendor,
+      authkeyTemplateId, authkeyHasImageHeader,
+    });
 
     /* Mark ecard as sent if it exists */
     if (ecard && result.success) {

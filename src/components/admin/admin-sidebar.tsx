@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CalendarDays, Bell, FileImage,
-  ClipboardList, LogOut, Menu, X, Shield, Package, ImagePlus, CreditCard,
+  ClipboardList, LogOut, Menu, X, Shield, Package, ImagePlus, CreditCard, MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -21,6 +21,7 @@ const NAV = [
   { label: "Tier Requests",   href: "/admin/tiers",            icon: Shield },
   { label: "Notif Templates", href: "/admin/templates",        icon: FileImage },
   { label: "E-card Templates",href: "/admin/ecard-templates",  icon: ImagePlus },
+  { label: "WhatsApp Templates",href: "/admin/whatsapp-templates", icon: MessageCircle },
   { label: "Notifications",   href: "/admin/notifications",    icon: Bell },
   { label: "Payments",         href: "/admin/payments",         icon: CreditCard },
   { label: "Audit Log",       href: "/admin/audit",            icon: ClipboardList },
